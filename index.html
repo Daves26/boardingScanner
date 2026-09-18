@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Manifiesto de Abordaje</title>
+<style>
+  :root{
+    --bg:#F3F5F7; --panel:#FFFFFF; --panel-2:#F7F9FA; --border:#DCE2E8;
+    --text:#12181F; --text-muted:#5B6673;
+    --accent:#B9720E; --accent-contrast:#FFFFFF;
+    --success:#1D8A54; --success-bg:#E4F6EC;
+    --danger:#C6323A; --danger-bg:#FBE7E8;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1220; --panel:#131B2E; --panel-2:#171F35; --border:#263254;
+      --text:#F2F5F8; --text-muted:#93A0B4;
+      --accent:#F2A93C; --accent-contrast:#1A1305;
+      --success:#34C77B; --success-bg:rgba(52,199,123,.14);
+      --danger:#FF6B6F; --danger-bg:rgba(255,107,111,.14);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1220; --panel:#131B2E; --panel-2:#171F35; --border:#263254;
+    --text:#F2F5F8; --text-muted:#93A0B4;
+    --accent:#F2A93C; --accent-contrast:#1A1305;
+    --success:#34C77B; --success-bg:rgba(52,199,123,.14);
+    --danger:#FF6B6F; --danger-bg:rgba(255,107,111,.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  [hidden]{display:none !important;}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--sans);
+    min-height:100vh; -webkit-tap-highlight-color:transparent;
+  }
+  #app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+
+  /* ---------- Barra superior ---------- */
+  header.topbar{
+    position:sticky; top:0; z-index:5;
+    background:var(--bg); border-bottom:1px solid var(--border);
+    padding:14px 16px 12px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+  }
+  .flight-field{flex:1; min-width:0;}
+  .flight-field label{display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;}
+  #flightLabel{
+    width:100%; border:1px solid var(--border); background:var(--panel); color:var(--text);
+    border-radius:8px; padding:8px 10px; font-size:14px; font-family:var(--sans);
+  }
+  #flightLabel:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .counter{text-align:right; flex-shrink:0;}
+  .counter .num{font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;}
+  .counter .lbl{display:block; font-size:11px; color:var(--text-muted); margin-top:2px;}
+
+  main{flex:1; padding:16px; display:flex; flex-direction:column; gap:14px; overflow-x:hidden;}
+
+  /* ---------- Botón de escaneo ---------- */
+  .scan-btn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:16px; border:none; border-radius:12px;
+    background:var(--accent); color:var(--accent-contrast);
+    font-size:17px; font-weight:600; font-family:var(--sans); cursor:pointer;
+  }
+  .scan-btn:active{opacity:.85;}
+  .scan-btn svg{width:22px;height:22px;flex-shrink:0;}
+
+  /* ---------- Barra de herramientas ---------- */
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap;}
+  #searchInput{
+    flex:1; min-width:120px; border:1px solid var(--border); background:var(--panel); color:var(--text);
+    border-radius:8px; padding:9px 10px; font-size:14px; font-family:var(--sans);
+  }
+  .btn-ghost{
+    border:1px solid var(--border); background:var(--panel); color:var(--text);
+    border-radius:8px; padding:9px 12px; font-size:13px; font-family:var(--sans); cursor:pointer; white-space:nowrap;
+  }
+  .btn-ghost.danger{color:var(--danger); border-color:var(--danger);}
+
+  /* ---------- Lista / manifiesto ---------- */
+  .empty{color:var(--text-muted); font-size:14px; text-align:center; padding:30px 10px; line-height:1.5;}
+  ol.manifest{list-style:none; margin:0; padding:0; border-top:1px solid var(--border);}
+  .row{
+    display:flex; gap:10px; align-items:flex-start; padding:12px 2px;
+    border-bottom:1px solid var(--border);
+  }
+  .row .seq{
+    font-family:var(--mono); font-size:12px; color:var(--text-muted); width:22px; flex-shrink:0; padding-top:3px; text-align:right;
+  }
+  .row .info{flex:1; min-width:0;}
+  .row .name{font-size:15px; font-weight:600; overflow-wrap:anywhere;}
+  .row .meta{font-size:12.5px; color:var(--text-muted); margin-top:3px; display:flex; flex-wrap:wrap; gap:6px 10px; font-family:var(--mono);}
+  .row .del{
+    border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;
+  }
+  .row .del:active{color:var(--danger);}
+  .row.dim{display:none;}
+
+  /* ---------- Overlay de escaneo ---------- */
+  .scan-overlay{
+    position:fixed; inset:0; background:#000; z-index:50;
+    display:flex; flex-direction:column;
+  }
+  .scan-overlay video{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000;
+  }
+  .viewfinder{
+    position:relative; margin:auto; width:82%; max-width:340px; aspect-ratio:16/7;
+    z-index:2; pointer-events:none;
+  }
+  .viewfinder .corner{position:absolute; width:26px; height:26px; border:3px solid var(--accent);}
+  .viewfinder .corner.tl{top:0;left:0;border-right:none;border-bottom:none;}
+  .viewfinder .corner.tr{top:0;right:0;border-left:none;border-bottom:none;}
+  .viewfinder .corner.bl{bottom:0;left:0;border-right:none;border-top:none;}
+  .viewfinder .corner.br{bottom:0;right:0;border-left:none;border-top:none;}
+  .scan-status{
+    position:relative; z-index:2; text-align:center; color:#fff; font-size:14px;
+    margin:14px 20px 0; text-shadow:0 1px 3px rgba(0,0,0,.6);
+  }
+  .scan-controls{
+    position:relative; z-index:2; display:flex; justify-content:center; gap:14px;
+    padding:22px 16px calc(22px + env(safe-area-inset-bottom));
+  }
+  .round-btn{
+    width:52px;height:52px;border-radius:50%; border:1px solid rgba(255,255,255,.35);
+    background:rgba(20,20,20,.55); color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .round-btn.close{background:rgba(198,50,58,.75);}
+  .round-btn.on{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
+
+  .feedback{
+    position:absolute; left:16px; right:16px; bottom:110px; z-index:3;
+    border-radius:12px; padding:14px 16px; text-align:left;
+    font-size:14px; line-height:1.4;
+  }
+  .feedback.ok{background:var(--success-bg); color:var(--success); border:1px solid var(--success);}
+  .feedback.dup{background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger);}
+  .feedback b{display:block; font-size:16px; margin-bottom:2px;}
+
+  /* ---------- Modal manual ---------- */
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:60; display:flex; align-items:flex-end;}
+  .modal-card{
+    background:var(--panel); width:100%; border-radius:16px 16px 0 0; padding:20px;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  .modal-card h2{margin:0 0 6px; font-size:17px;}
+  .modal-card p{margin:0 0 12px; font-size:13px; color:var(--text-muted); line-height:1.4;}
+  #manualInput{
+    width:100%; border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+    border-radius:8px; padding:10px; font-family:var(--mono); font-size:12.5px; resize:vertical;
+  }
+  .modal-actions{display:flex; gap:10px; margin-top:14px;}
+  .modal-actions button{flex:1; padding:11px; border-radius:8px; font-size:14px; font-family:var(--sans); cursor:pointer;}
+  .modal-actions .primary{border:none; background:var(--accent); color:var(--accent-contrast); font-weight:600;}
+  .modal-actions .secondary{border:1px solid var(--border); background:transparent; color:var(--text);}
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:70;
+    max-width:448px; margin:0 auto; background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:12px 14px; border-radius:10px; font-size:13.5px; box-shadow:0 6px 20px rgba(0,0,0,.18);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="flight-field">
+      <label for="flightLabel">Vuelo</label>
+      <input id="flightLabel" placeholder="Ej. 9R 8839 · EOH–LPZ" autocomplete="off" />
+    </div>
+    <div class="counter">
+      <span class="num" id="countNum">0</span>
+      <span class="lbl">abordados</span>
+    </div>
+  </header>
+
+  <main>
+    <button id="scanBtn" class="scan-btn">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 8V6a2 2 0 0 1 2-2h2M3 16v2a2 2 0 0 0 2 2h2M21 8V6a2 2 0 0 0-2-2h-2M21 16v2a2 2 0 0 1-2 2h-2M4 12h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Escanear pase de abordar
+    </button>
+
+    <div class="toolbar">
+      <input id="searchInput" placeholder="Buscar pasajero…" />
+      <button class="btn-ghost" id="manualBtn">Manual</button>
+      <button class="btn-ghost" id="exportBtn">Exportar CSV</button>
+      <button class="btn-ghost danger" id="clearBtn">Vaciar</button>
+    </div>
+
+    <p class="empty" id="emptyState">Aún no has escaneado a nadie. Toca "Escanear pase de abordar" para comenzar.</p>
+    <ol class="manifest" id="passengerList"></ol>
+  </main>
+</div>
+
+<!-- Overlay de cámara -->
+<div class="scan-overlay" id="scanOverlay" hidden>
+  <video id="video" playsinline muted></video>
+  <div class="viewfinder" aria-hidden="true">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+  </div>
+  <p class="scan-status" id="scanStatus">Iniciando cámara…</p>
+  <div id="feedback" class="feedback" hidden></div>
+  <div class="scan-controls">
+    <button class="round-btn" id="torchBtn" hidden title="Linterna">🔦</button>
+    <button class="round-btn close" id="closeBtn" title="Cerrar">✕</button>
+  </div>
+</div>
+
+<!-- Modal ingreso manual -->
+<div class="modal" id="manualModal" hidden>
+  <div class="modal-card">
+    <h2>Ingreso manual</h2>
+    <p>Si el código no se puede escanear (pase dañado, impresión borrosa), pega aquí el texto crudo del código de barras (formato IATA BCBP, el que empieza con "M1…").</p>
+    <textarea id="manualInput" rows="3" placeholder="M1APELLIDOS/NOMBRE...."></textarea>
+    <div class="modal-actions">
+      <button class="secondary" id="manualCancel">Cancelar</button>
+      <button class="primary" id="manualSubmit">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     1. DICCIONARIOS EDITABLES
+     Satena cubre aeropuertos regionales colombianos que no
+     siempre aparecen en bases de datos IATA genéricas. Agrega
+     aquí los códigos que uses.
+  ==========================================================*/
+  var AIRPORTS = {
+    EOH: "Olaya Herrera (Medellín)",
+    LPZ: "Los Pozos (San Gil)"
+    // Agrega más rutas propias aquí, ej: "ADZ": "Providencia"
+  };
+  var CLASSES = { Y:"Económica", C:"Ejecutiva", F:"Primera" };
+
+  /* =========================================================
+     2. PARSER BCBP (IATA Bar Coded Boarding Pass)
+     Los campos obligatorios (nombre, PNR, ruta, vuelo, asiento)
+     tienen posición FIJA según el estándar y son 100% confiables.
+     El número de tiquete vive en una sección de longitud variable
+     que el estándar no fija de forma universal: aquí se extrae
+     con una heurística (última racha larga de dígitos) que se
+     validó contra el ejemplo real de Satena. Revisa el campo
+     "ticketConfidence" si necesitas saber qué tan segura es.
+  ==========================================================*/
+  function parseBCBP(raw){
+    if (typeof raw !== "string") return { valid:false, raw:String(raw||"") };
+    var clean = raw.replace(/\n|\r/g,"");
+    if (clean.length < 58 || clean[0] !== "M") {
+      return { valid:false, raw: clean };
+    }
+    var f = function(a,b){ return clean.slice(a,b); };
+    var nameField = f(2,22).trim();
+    var apellidos = nameField, nombres = "";
+    if (nameField.indexOf("/") !== -1){
+      var parts = nameField.split("/");
+      apellidos = parts[0]; nombres = parts.slice(1).join(" ");
+    }
+    var pnr = f(23,30).trim();
+    var from = f(30,33).trim();
+    var to = f(33,36).trim();
+    var carrier = f(36,39).trim();
+    var flightNum = f(39,44).trim();
+    var julianDay = f(44,47).trim();
+    var compartment = f(47,48).trim();
+    var seatRaw = f(48,52);
+    var checkin = f(52,57).trim();
+    var paxStatus = f(57,58).trim();
+
+    var seat = null;
+    var seatRow = parseInt(seatRaw.slice(0,3),10);
+    var seatLetter = seatRaw.slice(3,4).trim();
+    if (!isNaN(seatRow) && seatLetter) seat = String(seatRow)+seatLetter;
+
+    var ticketNumber = null, ticketConfidence = "none";
+    var tail = clean.slice(58);
+    var runs = tail.match(/\d{10,}/g);
+    if (runs && runs.length){
+      var lastRun = runs[runs.length-1];
+      ticketNumber = lastRun.slice(0,13);
+      ticketConfidence = lastRun.length >= 13 ? "heuristica" : "parcial";
+    }
+
+    apellidos = apellidos.trim(); nombres = nombres.trim();
+
+    return {
+      valid:true, raw:clean,
+      apellidos:apellidos, nombres:nombres,
+      nombreCompleto: nombres ? (nombres+" "+apellidos) : apellidos,
+      pnr:pnr, origen:from, destino:to,
+      aerolinea:carrier, vuelo:flightNum,
+      vueloCompleto: (carrier+" "+flightNum).trim(),
+      diaJuliano:julianDay, clase:compartment,
+      asiento:seat, secuenciaCheckin:checkin, estadoPasajero:paxStatus,
+      ticketNumber:ticketNumber, ticketConfidence:ticketConfidence
+    };
+  }
+
+  function dedupeKey(p){
+    if (p.ticketNumber && p.ticketConfidence !== "none") return "T:"+p.ticketNumber;
+    return "K:"+p.pnr+"|"+p.aerolinea+p.vuelo+"|"+p.apellidos+"|"+p.nombres;
+  }
+
+  function toTitle(s){
+    return (s||"").toLowerCase().replace(/(^|\s|\/)([a-záéíóúñ])/g, function(m,sep,c){ return sep+c.toUpperCase(); });
+  }
+
+  /* =========================================================
+     3. ESTADO Y PERSISTENCIA (localStorage)
+  ==========================================================*/
+  var STORAGE_KEY = "manifiesto_abordaje_v1";
+  var state = { flight:"", passengers:[] };
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw){
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.passengers)) state = parsed;
+      }
+    }catch(e){ /* almacenamiento no disponible: seguimos solo en memoria */ }
+  }
+  function saveState(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  /* =========================================================
+     4. RENDER
+  ==========================================================*/
+  var els = {
+    flightLabel: document.getElementById("flightLabel"),
+    countNum: document.getElementById("countNum"),
+    list: document.getElementById("passengerList"),
+    empty: document.getElementById("emptyState"),
+    search: document.getElementById("searchInput"),
+    toast: document.getElementById("toast")
+  };
+
+  var toastTimer = null;
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ els.toast.hidden = true; }, 2600);
+  }
+
+  function airportLabel(code){
+    return AIRPORTS[code] ? code+" · "+AIRPORTS[code] : code;
+  }
+
+  function render(){
+    els.flightLabel.value = state.flight || "";
+    els.countNum.textContent = state.passengers.length;
+    els.empty.style.display = state.passengers.length ? "none" : "block";
+    els.list.innerHTML = "";
+
+    var q = (els.search.value||"").trim().toLowerCase();
+
+    state.passengers.forEach(function(p, idx){
+      var hay = (p.nombreCompleto+" "+p.pnr+" "+p.asiento).toLowerCase();
+      if (q && hay.indexOf(q) === -1) return;
+
+      var li = document.createElement("li");
+      li.className = "row";
+
+      var seq = document.createElement("div");
+      seq.className = "seq"; seq.textContent = (idx+1)+".";
+
+      var info = document.createElement("div");
+      info.className = "info";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = toTitle(p.nombreCompleto);
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var bits = [];
+      if (p.vueloCompleto) bits.push(p.vueloCompleto);
+      if (p.origen || p.destino) bits.push((p.origen||"?")+"→"+(p.destino||"?"));
+      if (p.asiento) bits.push("Asiento "+p.asiento);
+      if (p.pnr) bits.push("PNR "+p.pnr);
+      if (p.ticketNumber) bits.push("Tkt "+p.ticketNumber);
+      meta.textContent = bits.join("  ·  ");
+      info.appendChild(name); info.appendChild(meta);
+
+      var del = document.createElement("button");
+      del.className = "del"; del.setAttribute("aria-label","Eliminar");
+      del.textContent = "×";
+      del.addEventListener("click", function(){
+        if (confirm("¿Quitar a "+toTitle(p.nombreCompleto)+" de la lista?")){
+          state.passengers.splice(idx,1);
+          saveState(); render();
+        }
+      });
+
+      li.appendChild(seq); li.appendChild(info); li.appendChild(del);
+      els.list.appendChild(li);
+    });
+  }
+
+  els.flightLabel.addEventListener("input", function(){
+    state.flight = els.flightLabel.value; saveState();
+  });
+  els.search.addEventListener("input", render);
+
+  /* =========================================================
+     5. AGREGAR PASAJERO (con deduplicación)
+  ==========================================================*/
+  function addPassengerFromRaw(raw){
+    var p = parseBCBP(raw);
+    if (!p.valid){
+      return { status:"invalid" };
+    }
+    var key = dedupeKey(p);
+    var exists = state.passengers.some(function(x){ return x._key === key; });
+    if (exists){
+      return { status:"duplicate", passenger:p };
+    }
+    p._key = key;
+    p.scannedAt = new Date().toISOString();
+    state.passengers.push(p);
+    saveState(); render();
+    return { status:"added", passenger:p };
+  }
+
+  /* =========================================================
+     6. ESCÁNER DE CÁMARA (ZXing – PDF417)
+  ==========================================================*/
+  var overlay = document.getElementById("scanOverlay");
+  var video = document.getElementById("video");
+  var scanStatus = document.getElementById("scanStatus");
+  var feedback = document.getElementById("feedback");
+  var torchBtn = document.getElementById("torchBtn");
+  var closeBtn = document.getElementById("closeBtn");
+
+  var codeReader = null;
+  var scanLocked = false;
+  var torchOn = false;
+
+  function openScanner(){
+    overlay.hidden = false;
+    scanStatus.textContent = "Iniciando cámara…";
+    feedback.hidden = true;
+    torchBtn.hidden = true; torchOn = false;
+
+    if (typeof ZXing === "undefined"){
+      scanStatus.textContent = "No se pudo cargar el lector de códigos (sin conexión).";
+      return;
+    }
+    codeReader = new ZXing.BrowserPDF417Reader(300);
+
+    codeReader.decodeFromVideoDevice(null, video, function(result, err){
+      if (scanLocked) return;
+      if (result){
+        handleDecoded(result.getText());
+      }
+      // los errores "NotFound/Checksum/Format" son normales mientras
+      // no hay un código bien enfocado en cuadro: se ignoran.
+    }).then(function(){
+      scanStatus.textContent = "Apunta al código de barras (PDF417) del pase";
+      setupTorch();
+    }).catch(function(e){
+      var msg = "No se pudo acceder a la cámara.";
+      if (e && e.name === "NotAllowedError") msg = "Permiso de cámara denegado. Actívalo en los ajustes del navegador.";
+      else if (e && e.name === "NotFoundError") msg = "No se encontró una cámara en este dispositivo.";
+      scanStatus.textContent = msg;
+    });
+  }
+
+  function setupTorch(){
+    try{
+      var stream = video.srcObject;
+      if (!stream) return;
+      var track = stream.getVideoTracks()[0];
+      if (!track || !track.getCapabilities) return;
+      var caps = track.getCapabilities();
+      if (caps && caps.torch){
+        torchBtn.hidden = false;
+        torchBtn.onclick = function(){
+          torchOn = !torchOn;
+          track.applyConstraints({ advanced:[{ torch: torchOn }] }).catch(function(){});
+          torchBtn.classList.toggle("on", torchOn);
+        };
+      }
+    }catch(e){}
+  }
+
+  function handleDecoded(rawText){
+    var res = addPassengerFromRaw(rawText);
+    scanLocked = true;
+
+    if (navigator.vibrate) navigator.vibrate(res.status === "added" ? 80 : [40,60,40]);
+
+    feedback.hidden = false;
+    if (res.status === "added"){
+      feedback.className = "feedback ok";
+      feedback.innerHTML = "<b>Agregado ✓</b>"+toTitle(res.passenger.nombreCompleto)+
+        (res.passenger.asiento ? " · Asiento "+res.passenger.asiento : "");
+    } else if (res.status === "duplicate"){
+      feedback.className = "feedback dup";
+      feedback.innerHTML = "<b>Ya estaba en la lista</b>"+toTitle(res.passenger.nombreCompleto);
+    } else {
+      feedback.className = "feedback dup";
+      feedback.innerHTML = "<b>Código no reconocido</b>Esto no parece un pase de abordar IATA (BCBP).";
+    }
+
+    setTimeout(function(){
+      feedback.hidden = true;
+      scanLocked = false;
+    }, 1700);
+  }
+
+  function closeScanner(){
+    overlay.hidden = true;
+    if (codeReader){
+      try{ codeReader.reset(); }catch(e){}
+      codeReader = null;
+    }
+  }
+
+  document.getElementById("scanBtn").addEventListener("click", openScanner);
+  closeBtn.addEventListener("click", closeScanner);
+
+  /* =========================================================
+     7. INGRESO MANUAL
+  ==========================================================*/
+  var manualModal = document.getElementById("manualModal");
+  var manualInput = document.getElementById("manualInput");
+  document.getElementById("manualBtn").addEventListener("click", function(){
+    manualInput.value = ""; manualModal.hidden = false;
+  });
+  document.getElementById("manualCancel").addEventListener("click", function(){
+    manualModal.hidden = true;
+  });
+  document.getElementById("manualSubmit").addEventListener("click", function(){
+    var raw = manualInput.value.trim();
+    if (!raw) return;
+    var res = addPassengerFromRaw(raw);
+    manualModal.hidden = true;
+    if (res.status === "added") showToast("Agregado: "+toTitle(res.passenger.nombreCompleto));
+    else if (res.status === "duplicate") showToast("Ese pasajero ya estaba en la lista");
+    else showToast("No se reconoció como un pase de abordar IATA (BCBP)");
+  });
+
+  /* =========================================================
+     8. VACIAR LISTA
+  ==========================================================*/
+  document.getElementById("clearBtn").addEventListener("click", function(){
+    if (!state.passengers.length) return;
+    if (confirm("¿Vaciar toda la lista de "+state.passengers.length+" pasajero(s)? Esta acción no se puede deshacer.")){
+      state.passengers = [];
+      saveState(); render();
+      showToast("Lista vaciada");
+    }
+  });
+
+  /* =========================================================
+     9. EXPORTAR CSV
+  ==========================================================*/
+  function buildCSV(){
+    var header = ["Nombre completo","Apellidos","Nombres","PNR","Origen","Destino","Aerolinea","Vuelo","Clase","Asiento","Numero de tiquete","Hora de escaneo"];
+    var esc = function(v){
+      v = (v==null?"":String(v));
+      return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    };
+    var lines = [header.map(esc).join(",")];
+    state.passengers.forEach(function(p){
+      lines.push([
+        p.nombreCompleto,p.apellidos,p.nombres,p.pnr,p.origen,p.destino,
+        p.aerolinea,p.vuelo,CLASSES[p.clase]||p.clase,p.asiento,p.ticketNumber||"",
+        p.scannedAt||""
+      ].map(esc).join(","));
+    });
+    return lines.join("\r\n");
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    if (!state.passengers.length){ showToast("La lista está vacía"); return; }
+    var csv = buildCSV();
+    var filename = "manifiesto_"+(state.flight ? state.flight.replace(/[^a-z0-9]+/gi,"_") : "vuelo")+".csv";
+
+    (async function(){
+      try{
+        var downloads = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null;
+        if (downloads){
+          await downloads.save({ filename: filename, data: csv });
+          showToast("Archivo guardado");
+          return;
+        }
+      }catch(e){ /* seguimos al respaldo por portapapeles */ }
+
+      try{
+        await navigator.clipboard.writeText(csv);
+        showToast("Descarga no disponible aquí: CSV copiado al portapapeles");
+      }catch(e){
+        window.prompt("Copia el contenido CSV manualmente:", csv);
+      }
+    })();
+  });
+
+  /* =========================================================
+     10. INICIO
+  ==========================================================*/
+  loadState();
+  render();
+})();
+</script>
+</body>
+</html>
