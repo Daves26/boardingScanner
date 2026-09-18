@@ -104,13 +104,31 @@
     position:fixed; inset:0; background:#000; z-index:50;
     display:flex; flex-direction:column;
   }
+  /* IMPORTANTE: 'contain', no 'cover'.
+     Con la pantalla en vertical y un stream 16:9, 'cover' recorta y tira
+     alrededor del 70% del ancho del sensor — justo los píxeles que hacen
+     falta para resolver las barras finas. Con 'contain' se ve el cuadro
+     completo (con franjas negras arriba y abajo) y el recuadro del visor
+     puede abarcar casi todo el ancho real de la imagen. */
   .scan-overlay video{
-    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000;
+    position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000;
   }
+  /* El visor imita la forma real del PDF417 del pase (muy apaisado).
+     Cuanto más ajustado, más cerca acerca el usuario el papel y más
+     píxeles por módulo recibe el decodificador. */
   .viewfinder{
-    position:relative; margin:auto; width:82%; max-width:340px; aspect-ratio:16/7;
+    position:relative; margin:auto; width:94%; max-width:640px; aspect-ratio:6/1;
     z-index:2; pointer-events:none;
   }
+  .zoom-quick{
+    position:relative; z-index:3; display:flex; justify-content:center; gap:8px;
+    padding:0 16px 4px;
+  }
+  .zoom-quick button{
+    border:1px solid rgba(255,255,255,.35); background:rgba(20,20,20,.55); color:#fff;
+    border-radius:999px; padding:6px 14px; font-size:13px; cursor:pointer;
+  }
+  .zoom-quick button.on{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
   .viewfinder .corner{position:absolute; width:26px; height:26px; border:3px solid var(--accent);}
   .viewfinder .corner.tl{top:0;left:0;border-right:none;border-bottom:none;}
   .viewfinder .corner.tr{top:0;right:0;border-left:none;border-bottom:none;}
@@ -219,6 +237,12 @@
   <p class="scan-status" id="scanStatus">Iniciando cámara…</p>
   <p class="scan-diag" id="scanDiag"></p>
   <div id="feedback" class="feedback" hidden></div>
+  <div class="zoom-quick" id="zoomQuick" hidden>
+    <button type="button" data-z="1">1×</button>
+    <button type="button" data-z="2">2×</button>
+    <button type="button" data-z="3">3×</button>
+    <button type="button" data-z="max">Máx</button>
+  </div>
   <div class="zoom-row" id="zoomRow" hidden>
     <span aria-hidden="true">🔍</span>
     <input type="range" id="zoomInput" min="1" max="4" step="0.1" value="1" aria-label="Zoom">
@@ -226,9 +250,12 @@
   <div class="scan-controls">
     <button class="round-btn" id="torchBtn" hidden title="Linterna">🔦</button>
     <button class="round-btn" id="photoBtn" title="Tomar foto y analizar">📷</button>
+    <button class="round-btn" id="fileBtn" title="Usar la cámara del sistema o una foto de la galería">🖼</button>
     <button class="round-btn close" id="closeBtn" title="Cerrar">✕</button>
   </div>
 </div>
+
+<input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
 
 <!-- Modal ingreso manual -->
 <div class="modal" id="manualModal" hidden>
@@ -245,6 +272,10 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<!-- Motor principal en JS: zxing-wasm (compilación WebAssembly de zxing-cpp).
+     Decodifica PDF417 bastante mejor que el port JS puro. -->
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
+<!-- Último respaldo si el wasm no carga (red bloqueada, navegador viejo). -->
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 (function(){
@@ -453,18 +484,33 @@
   }
 
   /* =========================================================
-     6. ESCÁNER DE CÁMARA
+     6. ESCÁNER DE CÁMARA — optimizado para PDF417 PEQUEÑOS
 
-     Dos motores de decodificación:
-       1) BarcodeDetector nativo del sistema (Chrome en Android
-          con Google Play Services). Es el que de verdad lee un
-          PDF417 denso de pase de abordar.
-       2) ZXing (JS) como respaldo si el navegador no lo tiene.
+     El PDF417 de los pases de Satena es muy denso: unos 240
+     módulos de ancho metidos en ~3 cm de papel térmico. Eso deja
+     un módulo (la barra más fina) de aprox. 0,12 mm. Para que un
+     decodificador lo resuelva necesita, medido empíricamente:
 
-     Además se pide video en ALTA RESOLUCIÓN. La versión anterior
-     dejaba que el navegador eligiera (típicamente 640x480), y a
-     esa resolución las barras finas de un PDF417 no se resuelven:
-     la cámara se veía bien pero nunca decodificaba nada.
+       · ~1,75 px por módulo si se le entrega la imagen tal cual
+       · ~1,0  px por módulo si la imagen se AMPLÍA x2 o x3 con
+         interpolación suave antes de decodificar
+
+     Es decir: ampliar por software antes de decodificar baja el
+     umbral casi a la mitad. Esa es la optimización central de
+     esta versión. Las otras tres son:
+
+       1) Recortar SOLO el recuadro del visor (ROI) del cuadro de
+          video, en resolución nativa, en vez de mandar el cuadro
+          completo. Los decodificadores reducen internamente las
+          imágenes grandes, y ahí se perdían las barras finas.
+       2) Empujar la cámara a la resolución máxima que acepte.
+       3) Usar zxing-wasm (zxing-cpp compilado a WebAssembly),
+          cuyo lector de PDF417 es bastante mejor que el port de
+          ZXing en JS puro, con tryHarder / denoise / binarizador
+          de promedio local (papel térmico mal iluminado).
+
+     Orden de motores: BarcodeDetector nativo → zxing-wasm →
+     @zxing/library (último recurso).
   ==========================================================*/
   var overlay    = document.getElementById("scanOverlay");
   var video      = document.getElementById("video");
@@ -473,50 +519,89 @@
   var feedback   = document.getElementById("feedback");
   var torchBtn   = document.getElementById("torchBtn");
   var photoBtn   = document.getElementById("photoBtn");
+  var fileBtn    = document.getElementById("fileBtn");
+  var fileInput  = document.getElementById("fileInput");
   var closeBtn   = document.getElementById("closeBtn");
   var zoomRow    = document.getElementById("zoomRow");
   var zoomInput  = document.getElementById("zoomInput");
+  var zoomQuick  = document.getElementById("zoomQuick");
+  var viewfinder = overlay.querySelector(".viewfinder");
 
   var mediaStream = null, videoTrack = null;
-  var nativeDetector = null, zxingReader = null;
+  var nativeDetector = null, wasmOK = false, jsReader = null;
   var engineLabel = "", rafId = null;
   var busy = false, scanLocked = false, torchOn = false;
-  var attempts = 0, lastDiag = 0;
+  var attempts = 0, lastDiag = 0, lastTick = 0, variantIdx = 0;
+  var lastHit = "";
+
+  // Lienzo de trabajo reutilizado (evita crear uno por cuadro).
+  var workCanvas = document.createElement("canvas");
+  var workCtx    = workCanvas.getContext("2d", { willReadFrequently:true });
+  var MAX_PIXELS = 8e6;   // techo por análisis (medido: ~90 ms a 5 MP con wasm)
+  var SCAN_EVERY = 110;   // ms entre análisis
+
+  var WASM_OPTS = {
+    formats: ["PDF417"],
+    tryHarder: true,
+    tryRotate: true,
+    tryInvert: true,
+    // OJO: tryDownscale debe quedar en true. No significa "reducir la
+    // imagen y perder detalle": zxing-cpp usa una pirámide de escalas
+    // para LOCALIZAR el símbolo dentro de la imagen, y luego lo lee a
+    // resolución plena. Ponerlo en false hace que no encuentre nada en
+    // imágenes grandes (medido: 0 lecturas con él desactivado).
+    tryDownscale: true,
+    tryDenoise: true,      // ayuda con el grano del papel térmico
+    binarizer: "LocalAverage",
+    minLineCount: 2,
+    maxNumberOfSymbols: 1
+  };
 
   function setDiag(extra){
-    var res = video.videoWidth ? (video.videoWidth + "x" + video.videoHeight) : "?";
+    var res = video.videoWidth ? (video.videoWidth + "\u00d7" + video.videoHeight) : "?";
     scanDiag.textContent = "Motor: " + (engineLabel || "-") +
       " \u00b7 Video: " + res +
       " \u00b7 An\u00e1lisis: " + attempts +
+      (lastHit ? " \u00b7 " + lastHit : "") +
       (extra ? " \u00b7 " + extra : "");
   }
 
-  function chooseEngine(){
-    return Promise.resolve()
-      .then(function(){
-        if (!("BarcodeDetector" in window)) return null;
-        return window.BarcodeDetector.getSupportedFormats().then(function(f){
-          if (f && f.indexOf("pdf417") !== -1){
-            nativeDetector = new window.BarcodeDetector({ formats:["pdf417"] });
-            engineLabel = "nativo";
-            return true;
-          }
-          return null;
-        }).catch(function(){ return null; });
-      })
-      .then(function(ok){
-        if (ok) return true;
-        if (typeof ZXing !== "undefined"){
-          zxingReader = new ZXing.BrowserPDF417Reader(150);
-          engineLabel = "ZXing (respaldo)";
-          return true;
+  /* --- Motores disponibles --- */
+  function chooseEngines(){
+    var labels = [];
+    var p1 = Promise.resolve().then(function(){
+      if (!("BarcodeDetector" in window)) return;
+      return window.BarcodeDetector.getSupportedFormats().then(function(f){
+        if (f && f.indexOf("pdf417") !== -1){
+          nativeDetector = new window.BarcodeDetector({ formats:["pdf417"] });
+          labels.push("nativo");
         }
-        return false;
-      });
+      }).catch(function(){});
+    });
+
+    // Precalentar el wasm para que la primera lectura no se demore.
+    var p2 = Promise.resolve().then(function(){
+      if (!window.ZXingWASM || !window.ZXingWASM.readBarcodes) return;
+      var probe = document.createElement("canvas");
+      probe.width = 8; probe.height = 8;
+      var id = probe.getContext("2d").getImageData(0,0,8,8);
+      return window.ZXingWASM.readBarcodes(id, WASM_OPTS).then(function(){
+        wasmOK = true; labels.push("zxing-wasm");
+      }).catch(function(){});
+    });
+
+    return Promise.all([p1,p2]).then(function(){
+      if (typeof ZXing !== "undefined"){
+        try{ jsReader = new ZXing.PDF417Reader(); labels.push("zxing-js"); }catch(e){}
+      }
+      engineLabel = labels.join(" + ") || "";
+      return labels.length > 0;
+    });
   }
 
-  // Se prueban varias combinaciones, de la mejor a la más básica.
+  /* --- Cámara: pedir la mayor resolución posible --- */
   var CONSTRAINT_SETS = [
+    { video:{ facingMode:{ exact:"environment" }, width:{ ideal:3840 }, height:{ ideal:2160 } } },
     { video:{ facingMode:{ exact:"environment" }, width:{ ideal:2560 }, height:{ ideal:1440 } } },
     { video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
     { video:{ facingMode:"environment" } },
@@ -533,78 +618,201 @@
       });
   }
 
-  function openScanner(){
-    overlay.hidden = false;
-    feedback.hidden = true;
-    torchBtn.hidden = true; torchOn = false;
-    zoomRow.hidden = true;
-    attempts = 0; scanLocked = false; busy = false;
-    scanDiag.textContent = "";
-    scanStatus.textContent = "Iniciando c\u00e1mara\u2026";
+  // Segundo intento: si el dispositivo declara poder dar más, se lo pedimos.
+  function pushMaxResolution(){
+    try{
+      if (!videoTrack || !videoTrack.getCapabilities) return Promise.resolve();
+      var caps = videoTrack.getCapabilities();
+      var cur  = videoTrack.getSettings ? videoTrack.getSettings() : {};
+      if (!caps || !caps.width || !caps.width.max) return Promise.resolve();
+      var target = Math.min(caps.width.max, 3840);
+      if (target <= (cur.width || 0)) return Promise.resolve();
+      return videoTrack.applyConstraints({
+        width:{ ideal: target },
+        height:{ ideal: Math.min(caps.height && caps.height.max || 2160, 2160) }
+      }).catch(function(){});
+    }catch(e){ return Promise.resolve(); }
+  }
 
-    // La cámara SOLO funciona en contexto seguro: https:// o localhost.
-    // Abrir el archivo como file:///... deja navigator.mediaDevices sin definir.
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      scanStatus.innerHTML = "Este navegador no expone la c\u00e1mara a la p\u00e1gina.<br>" +
-        "Ocurre al abrir el archivo directamente (<code>file://</code>): hay que servirlo por " +
-        "<b>https://</b> o <b>localhost</b>. Mientras tanto puedes usar el ingreso manual.";
-      return;
+  /* --- Región de interés: el recuadro del visor, en píxeles de video ---
+     El <video> usa object-fit:contain, así que la imagen se escala hasta
+     caber entera y queda centrada con franjas. Deshacemos esa
+     transformación para saber qué trozo del cuadro real corresponde al
+     recuadro que ve el usuario. */
+  function roiRect(){
+    if (!video.videoWidth || !video.videoHeight) return null;
+    var vr = video.getBoundingClientRect();
+    var fr = viewfinder.getBoundingClientRect();
+    if (!vr.width || !fr.width) return null;
+
+    var scale = Math.min(vr.width / video.videoWidth, vr.height / video.videoHeight);
+    var dx = (vr.width  - video.videoWidth  * scale) / 2;
+    var dy = (vr.height - video.videoHeight * scale) / 2;
+
+    var x = (fr.left - vr.left - dx) / scale;
+    var y = (fr.top  - vr.top  - dy) / scale;
+    var w = fr.width  / scale;
+    var h = fr.height / scale;
+
+    // Margen de tolerancia: el usuario nunca encuadra perfecto.
+    var mx = w * 0.08, my = h * 0.55;
+    x -= mx; y -= my; w += 2*mx; h += 2*my;
+
+    x = Math.max(0, x); y = Math.max(0, y);
+    w = Math.min(w, video.videoWidth  - x);
+    h = Math.min(h, video.videoHeight - y);
+    if (w < 40 || h < 20) return null;
+    return { x:x, y:y, w:w, h:h };
+  }
+
+  /* --- Dibuja un recorte AMPLIADO en el lienzo de trabajo ---
+     La ampliación con interpolación suave es lo que permite leer
+     códigos con ~1 px por módulo. */
+  var stepCanvas = document.createElement("canvas");
+  var stepCtx    = stepCanvas.getContext("2d", { willReadFrequently:true });
+
+  function smooth(ctx){
+    ctx.imageSmoothingEnabled = true;
+    try{ ctx.imageSmoothingQuality = "high"; }catch(e){}
+  }
+
+  function drawScaled(src, sx, sy, sw, sh, factor){
+    sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
+    sw = Math.max(1, Math.round(sw)); sh = Math.max(1, Math.round(sh));
+    var f = factor;
+    if (sw*f * sh*f > MAX_PIXELS) f = Math.sqrt(MAX_PIXELS / (sw*sh));
+    if (f < 0.05) f = 0.05;
+
+    var tw = Math.max(1, Math.round(sw * f));
+    var th = Math.max(1, Math.round(sh * f));
+
+    // Ampliación PROGRESIVA: el remuestreo del canvas se degrada mucho
+    // cuando se amplía más de ~2x de una sola vez (medido: lecturas
+    // erráticas a x3 y x5, correctas a x2). Duplicar por pasos conserva
+    // bastante mejor el borde de las barras.
+    if (f > 2){
+      var cw = sw * 2, ch = sh * 2;
+      stepCanvas.width = Math.round(cw); stepCanvas.height = Math.round(ch);
+      smooth(stepCtx);
+      stepCtx.drawImage(src, sx, sy, sw, sh, 0, 0, stepCanvas.width, stepCanvas.height);
+      while (cw * 2 <= tw){
+        var pw = Math.round(cw), ph = Math.round(ch);
+        cw *= 2; ch *= 2;
+        var tmp = document.createElement("canvas");
+        tmp.width = Math.round(cw); tmp.height = Math.round(ch);
+        var tctx = tmp.getContext("2d"); smooth(tctx);
+        tctx.drawImage(stepCanvas, 0, 0, pw, ph, 0, 0, tmp.width, tmp.height);
+        stepCanvas = tmp; stepCtx = tctx;
+      }
+      workCanvas.width = tw; workCanvas.height = th;
+      smooth(workCtx);
+      workCtx.drawImage(stepCanvas, 0, 0, stepCanvas.width, stepCanvas.height, 0, 0, tw, th);
+      return workCanvas;
     }
 
-    chooseEngine().then(function(ok){
-      if (!ok){
-        scanStatus.textContent = "No hay ning\u00fan lector de c\u00f3digos disponible " +
-          "(el navegador no trae uno nativo y la librer\u00eda no carg\u00f3: revisa la conexi\u00f3n).";
-        return;
-      }
-      setDiag();
-      return getStream(0).then(function(stream){
-        mediaStream = stream;
-        videoTrack  = stream.getVideoTracks()[0];
-        setupTorch();
-        setupZoom();
-        tryContinuousFocus();
+    workCanvas.width = tw; workCanvas.height = th;
+    smooth(workCtx);
+    workCtx.drawImage(src, sx, sy, sw, sh, 0, 0, tw, th);
+    return workCanvas;
+  }
 
-        if (nativeDetector){
-          video.srcObject = mediaStream;
-          video.setAttribute("playsinline","");
-          var pl = video.play();
-          if (pl && pl.catch) pl.catch(function(){});
-          scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
-          setDiag();
-          loopNative();
-        } else {
-          zxingReader.decodeFromStream(mediaStream, video, function(result){
-            attempts++;
-            if (Date.now() - lastDiag > 500){ lastDiag = Date.now(); setDiag(); }
-            if (result && !scanLocked) handleDecoded(result.getText());
-          }).then(function(){
-            scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
-          }).catch(function(){
-            scanStatus.textContent = "No se pudo iniciar el lector de respaldo.";
-          });
-        }
-      });
-    }).catch(function(e){
-      var msg = "No se pudo acceder a la c\u00e1mara.";
-      if (e && e.name === "NotAllowedError") msg = "Permiso de c\u00e1mara denegado. Act\u00edvalo en los ajustes del navegador para este sitio.";
-      else if (e && e.name === "NotFoundError") msg = "No se encontr\u00f3 ninguna c\u00e1mara en este dispositivo.";
-      else if (e && e.name === "NotReadableError") msg = "La c\u00e1mara est\u00e1 ocupada por otra app. Ci\u00e9rrala e int\u00e9ntalo de nuevo.";
-      scanStatus.textContent = msg;
+  /* --- Decodificar un lienzo con TODOS los motores ---
+     Los tres motores se complementan y ninguno domina:
+       · BarcodeDetector nativo: el más rápido en Android.
+       · zxing-wasm (zxing-cpp): el mejor con códigos diminutos y bien
+         alineados, pero MEDIDO: falla con el símbolo inclinado ~3°.
+       · @zxing/library (JS): más lento y menos sensible al tamaño, pero
+         MEDIDO: es el único que lee los casos inclinados y desenfocados.
+     Por eso los tres corren en el bucle en vivo, no sólo como respaldo. */
+  function decodeJS(canvas){
+    if (!jsReader) return null;
+    // OJO: no se puede usar createBinaryBitmap(canvas): esa función espera
+    // un <video> y lee videoWidth/videoHeight, así que con un canvas lanza
+    // IndexSizeError. Hay que montar el BinaryBitmap a mano. La ruta por
+    // dataURL también funciona pero cuesta 150-400 ms; ésta ~100 ms.
+    try{
+      var src = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+      var bm  = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));
+      var res = jsReader.decode(bm);
+      return res ? res.getText() : null;
+    }catch(e){ return null; }   // NotFoundException en cada cuadro sin código
+  }
+
+  function decodeCanvas(canvas){
+    var step = nativeDetector
+      ? nativeDetector.detect(canvas)
+          .then(function(c){ return (c && c.length) ? c[0].rawValue : null; })
+          .catch(function(){ return null; })
+      : Promise.resolve(null);
+
+    return step.then(function(text){
+      if (text || !wasmOK) return text;
+      var id;
+      try{ id = workCtx.getImageData(0, 0, canvas.width, canvas.height); }
+      catch(e){ return null; }
+      return window.ZXingWASM.readBarcodes(id, WASM_OPTS)
+        .then(function(r){ return (r && r.length) ? r[0].text : null; })
+        .catch(function(){ return null; });
+    }).then(function(text){
+      return text || decodeJS(canvas);
     });
   }
 
-  function loopNative(){
-    rafId = requestAnimationFrame(loopNative);
-    if (busy || scanLocked || !nativeDetector || video.readyState < 2) return;
+  /* --- Bucle en vivo: cada análisis prueba una variante distinta ---
+     Alternar variantes mantiene la fluidez y cubre tanto el caso
+     "código diminuto bien encuadrado" como "código fuera del recuadro". */
+  /* Orden pensado por probabilidad: primero el caso normal (el código
+     llena el visor), después los rescates para cuando el usuario no
+     puede acercarse más y el código queda pequeño dentro del recuadro.
+     Medido: recortar ajustado pesa más que ampliar mucho. */
+  var VARIANTS = [
+    { label:"ROI \u00d72",        crop:1.00, f:2 },
+    { label:"cuadro \u00d71",     crop:null, f:1 },
+    { label:"ROI \u00d71",        crop:1.00, f:1 },
+    { label:"ROI \u00d73",        crop:1.00, f:3 },
+    { label:"centro 55% \u00d72", crop:0.55, f:2 },
+    { label:"centro 30% \u00d72", crop:0.30, f:2 },
+    { label:"centro 40% \u00d73", crop:0.40, f:3 },
+    { label:"centro 20% \u00d73", crop:0.20, f:3 }
+  ];
+
+  function loop(){
+    rafId = requestAnimationFrame(loop);
+    if (busy || scanLocked || overlay.hidden || video.readyState < 2) return;
+    var now = Date.now();
+    if (now - lastTick < SCAN_EVERY) return;
+    lastTick = now;
     busy = true;
-    nativeDetector.detect(video).then(function(codes){
+
+    var v   = VARIANTS[variantIdx % VARIANTS.length];
+    variantIdx++;
+    var roi = (v.crop !== null) ? roiRect() : null;
+    if (roi && v.crop < 1){
+      // Subrecorte centrado: si el código no llena el visor, acercarse
+      // por software permite ampliarlo mucho más dentro del techo de píxeles.
+      var cw = roi.w * v.crop, ch = roi.h * v.crop;
+      roi = { x: roi.x + (roi.w-cw)/2, y: roi.y + (roi.h-ch)/2, w: cw, h: ch };
+    }
+    var canvas;
+    try{
+      canvas = roi
+        ? drawScaled(video, roi.x, roi.y, roi.w, roi.h, v.f)
+        : drawScaled(video, 0, 0, video.videoWidth, video.videoHeight, 1);
+    }catch(e){ busy = false; return; }
+
+    var srcPx = roi ? Math.round(roi.w) : video.videoWidth;
+
+    decodeCanvas(canvas).then(function(text){
       attempts++;
-      if (Date.now() - lastDiag > 400){ lastDiag = Date.now(); setDiag(); }
-      if (codes && codes.length && !scanLocked) handleDecoded(codes[0].rawValue);
-    }).catch(function(){
-      // frames sin código: normal
-    }).then(function(){ busy = false; });
+      if (text && !scanLocked){
+        lastHit = "le\u00eddo con " + v.label;
+        handleDecoded(text);
+      }
+      if (Date.now() - lastDiag > 400){
+        lastDiag = Date.now();
+        setDiag(v.label + " \u00b7 recorte " + srcPx + "px \u2192 " + workCanvas.width + "px");
+      }
+    }).catch(function(){}).then(function(){ busy = false; });
   }
 
   function tryContinuousFocus(){
@@ -613,6 +821,25 @@
       var caps = videoTrack.getCapabilities();
       if (caps && caps.focusMode && caps.focusMode.indexOf("continuous") !== -1){
         videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(function(){});
+      }
+    }catch(e){}
+  }
+
+  // Tocar la pantalla vuelve a disparar el enfoque (clave con papel cerca).
+  function refocus(){
+    try{
+      if (!videoTrack || !videoTrack.getCapabilities) return;
+      var caps = videoTrack.getCapabilities();
+      if (!caps || !caps.focusMode) return;
+      var single = caps.focusMode.indexOf("single-shot") !== -1;
+      var cont   = caps.focusMode.indexOf("continuous")  !== -1;
+      if (single && cont){
+        videoTrack.applyConstraints({ advanced:[{ focusMode:"single-shot" }] })
+          .then(function(){
+            setTimeout(function(){
+              videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(function(){});
+            }, 900);
+          }).catch(function(){});
       }
     }catch(e){}
   }
@@ -632,25 +859,94 @@
     }catch(e){}
   }
 
+  function applyZoom(val){
+    if (!videoTrack) return;
+    videoTrack.applyConstraints({ advanced:[{ zoom: val }] }).catch(function(){});
+    zoomInput.value = val;
+  }
+
   function setupZoom(){
     try{
       if (!videoTrack || !videoTrack.getCapabilities) return;
       var caps = videoTrack.getCapabilities();
-      if (caps && caps.zoom && caps.zoom.max > caps.zoom.min){
-        zoomRow.hidden = false;
-        zoomInput.min  = caps.zoom.min;
-        zoomInput.max  = caps.zoom.max;
-        zoomInput.step = caps.zoom.step || 0.1;
-        var cur = videoTrack.getSettings ? videoTrack.getSettings().zoom : null;
-        zoomInput.value = cur || caps.zoom.min;
-        zoomInput.oninput = function(){
-          videoTrack.applyConstraints({ advanced:[{ zoom: parseFloat(zoomInput.value) }] }).catch(function(){});
+      if (!caps || !caps.zoom || !(caps.zoom.max > caps.zoom.min)) return;
+
+      zoomRow.hidden = false; zoomQuick.hidden = false;
+      zoomInput.min  = caps.zoom.min;
+      zoomInput.max  = caps.zoom.max;
+      zoomInput.step = caps.zoom.step || 0.1;
+      var cur = videoTrack.getSettings ? videoTrack.getSettings().zoom : null;
+      zoomInput.value = cur || caps.zoom.min;
+      zoomInput.oninput = function(){ applyZoom(parseFloat(zoomInput.value)); };
+
+      Array.prototype.forEach.call(zoomQuick.querySelectorAll("button"), function(b){
+        var target = b.dataset.z === "max" ? caps.zoom.max : parseFloat(b.dataset.z);
+        if (target > caps.zoom.max) { b.hidden = true; return; }
+        b.hidden = false;
+        b.onclick = function(){
+          applyZoom(target);
+          Array.prototype.forEach.call(zoomQuick.querySelectorAll("button"), function(o){ o.classList.remove("on"); });
+          b.classList.add("on");
         };
-      }
+      });
     }catch(e){}
   }
 
-  /* --- Captura de foto a máxima resolución (plan B manual) --- */
+  function openScanner(){
+    overlay.hidden = false;
+    feedback.hidden = true;
+    torchBtn.hidden = true; torchOn = false;
+    zoomRow.hidden = true; zoomQuick.hidden = true;
+    attempts = 0; variantIdx = 0; lastHit = "";
+    scanLocked = false; busy = false;
+    scanDiag.textContent = "";
+    scanStatus.textContent = "Iniciando c\u00e1mara\u2026";
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      scanStatus.innerHTML = "Este navegador no expone la c\u00e1mara a la p\u00e1gina.<br>" +
+        "Ocurre al abrir el archivo directamente (<code>file://</code>): hay que servirlo por " +
+        "<b>https://</b> o <b>localhost</b>. Mientras tanto puedes usar 🖼 o el ingreso manual.";
+      return;
+    }
+
+    chooseEngines().then(function(ok){
+      if (!ok){
+        scanStatus.textContent = "No hay ning\u00fan lector de c\u00f3digos disponible " +
+          "(el navegador no trae uno nativo y las librer\u00edas no cargaron: revisa la conexi\u00f3n).";
+        return;
+      }
+      setDiag();
+      return getStream(0).then(function(stream){
+        mediaStream = stream;
+        videoTrack  = stream.getVideoTracks()[0];
+        return pushMaxResolution().then(function(){
+          setupTorch();
+          setupZoom();
+          tryContinuousFocus();
+          video.srcObject = mediaStream;
+          video.setAttribute("playsinline","");
+          var pl = video.play();
+          if (pl && pl.catch) pl.catch(function(){});
+          scanStatus.textContent = "Llena el recuadro con el c\u00f3digo de barras. " +
+            "Si no lee, sube el zoom y toca la pantalla para reenfocar.";
+          setDiag();
+          loop();
+        });
+      });
+    }).catch(function(e){
+      var msg = "No se pudo acceder a la c\u00e1mara.";
+      if (e && e.name === "NotAllowedError") msg = "Permiso de c\u00e1mara denegado. Act\u00edvalo en los ajustes del navegador para este sitio.";
+      else if (e && e.name === "NotFoundError") msg = "No se encontr\u00f3 ninguna c\u00e1mara en este dispositivo.";
+      else if (e && e.name === "NotReadableError") msg = "La c\u00e1mara est\u00e1 ocupada por otra app. Ci\u00e9rrala e int\u00e9ntalo de nuevo.";
+      scanStatus.textContent = msg;
+    });
+  }
+
+  /* --- Plan B: foto a resolución de sensor ---
+     El encuadre de la foto puede no coincidir con el del video (es un
+     comportamiento conocido de ImageCapture), así que en vez de usar el
+     ROI del visor se prueban varios recortes centrados y varias
+     ampliaciones, de lo más ajustado a lo más amplio. */
   function grabBitmap(){
     return Promise.resolve().then(function(){
       if (window.ImageCapture && videoTrack){
@@ -669,34 +965,87 @@
     });
   }
 
+  // Recortes centrados (fracción del ancho) × factores de ampliación.
+  var STILL_PASSES = [
+    { frac:0.55, f:3 }, { frac:0.55, f:2 },
+    { frac:0.80, f:2 }, { frac:0.80, f:1.5 },
+    { frac:1.00, f:1.5 }, { frac:1.00, f:1 },
+    { frac:0.35, f:4 }
+  ];
+
+  function decodeFromSource(src, srcW, srcH, statusEl){
+    var i = 0;
+    function next(){
+      if (i >= STILL_PASSES.length) return Promise.resolve(null);
+      var p = STILL_PASSES[i++];
+      var w = srcW * p.frac;
+      var h = srcH * p.frac;
+      var x = (srcW - w) / 2;
+      var y = (srcH - h) / 2;
+      var canvas;
+      try{ canvas = drawScaled(src, x, y, w, h, p.f); }
+      catch(e){ return next(); }
+      if (statusEl){
+        statusEl.textContent = "Analizando\u2026 (" + i + "/" + STILL_PASSES.length + ")";
+      }
+      return decodeCanvas(canvas).then(function(text){
+        if (text){ lastHit = "le\u00eddo en foto, recorte " + Math.round(p.frac*100) + "% \u00d7" + p.f; return text; }
+        return next();
+      });
+    }
+    return next();
+  }
+
   function decodeStill(){
     if (scanLocked || !mediaStream) return;
     scanStatus.textContent = "Analizando foto\u2026";
+    var wasBusy = busy; busy = true;   // pausa el bucle mientras tanto
     grabBitmap().then(function(bmp){
-      var c = document.createElement("canvas");
-      c.width = bmp.width; c.height = bmp.height;
-      c.getContext("2d").drawImage(bmp, 0, 0);
-      setDiag("foto " + bmp.width + "x" + bmp.height);
-
-      var step = nativeDetector
-        ? nativeDetector.detect(c).then(function(codes){
-            return (codes && codes.length) ? codes[0].rawValue : null;
-          }).catch(function(){ return null; })
-        : Promise.resolve(null);
-
-      return step.then(function(text){
-        if (text || typeof ZXing === "undefined") return text;
-        var r = new ZXing.BrowserPDF417Reader();
-        return r.decodeFromImageUrl(c.toDataURL("image/png"))
-          .then(function(res){ return res.getText(); })
-          .catch(function(){ return null; });
-      });
+      setDiag("foto " + bmp.width + "\u00d7" + bmp.height);
+      return decodeFromSource(bmp, bmp.width, bmp.height, scanStatus);
     }).then(function(text){
+      busy = false;
       if (video.paused){ var pl = video.play(); if (pl && pl.catch) pl.catch(function(){}); }
       if (text) handleDecoded(text);
-      else scanStatus.textContent = "En esa foto no se ley\u00f3 ning\u00fan PDF417. Ac\u00e9rcate m\u00e1s, aplana el papel y evita reflejos.";
+      else scanStatus.textContent = "En esa foto no se ley\u00f3 ning\u00fan PDF417. " +
+        "Ac\u00e9rcate hasta ~12 cm, sube el zoom, aplana el papel y evita reflejos. " +
+        "Si sigue sin leer, prueba 🖼 (c\u00e1mara del sistema).";
     }).catch(function(){
+      busy = wasBusy;
       scanStatus.textContent = "No se pudo capturar la foto.";
+    });
+  }
+
+  /* --- Plan C: imagen tomada con la cámara nativa del teléfono o de la galería ---
+     La app de cámara del sistema usa el sensor completo, autoenfoque macro,
+     HDR y estabilización: en la práctica saca mucho más detalle que un
+     stream de video. Esta ruta funciona incluso sin permiso de cámara web. */
+  function handleFile(file){
+    if (!file) return;
+    var wasOpen = !overlay.hidden;
+    if (wasOpen) scanStatus.textContent = "Analizando imagen\u2026";
+    else showToast("Analizando imagen\u2026");
+
+    createImageBitmap(file).then(function(bmp){
+      return decodeFromSource(bmp, bmp.width, bmp.height, wasOpen ? scanStatus : null)
+        .then(function(text){
+          if (text){
+            if (wasOpen) handleDecoded(text);
+            else {
+              var res = addPassengerFromRaw(text);
+              if (res.status === "added") showToast("Agregado: "+toTitle(res.passenger.nombreCompleto));
+              else if (res.status === "duplicate") showToast("Ese pasajero ya estaba en la lista");
+              else showToast("Se ley\u00f3 un c\u00f3digo, pero no es un pase IATA");
+            }
+          } else {
+            var m = "No se encontr\u00f3 un PDF417 legible en esa imagen. " +
+                    "Rep\u00edtela m\u00e1s cerca y solo del c\u00f3digo de barras.";
+            if (wasOpen) scanStatus.textContent = m; else showToast(m);
+          }
+        });
+    }).catch(function(){
+      var m = "No se pudo leer esa imagen.";
+      if (wasOpen) scanStatus.textContent = m; else showToast(m);
     });
   }
 
@@ -723,14 +1072,14 @@
     setTimeout(function(){
       feedback.hidden = true;
       scanLocked = false;
-      if (!overlay.hidden) scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
+      if (!overlay.hidden) scanStatus.textContent = "Llena el recuadro con el c\u00f3digo de barras.";
     }, 1700);
   }
 
   function closeScanner(){
     overlay.hidden = true;
     if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
-    if (zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
+    jsReader = null;
     nativeDetector = null;
     if (mediaStream){
       mediaStream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
@@ -744,6 +1093,13 @@
   document.getElementById("scanBtn").addEventListener("click", openScanner);
   closeBtn.addEventListener("click", closeScanner);
   photoBtn.addEventListener("click", decodeStill);
+  fileBtn.addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(){
+    var f = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    handleFile(f);
+  });
+  video.addEventListener("click", refocus);
 
   /* =========================================================
      7. INGRESO MANUAL
