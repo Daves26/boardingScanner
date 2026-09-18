@@ -132,6 +132,17 @@
   .round-btn.close{background:rgba(198,50,58,.75);}
   .round-btn.on{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
 
+  .scan-diag{
+    position:relative; z-index:2; text-align:center; color:rgba(255,255,255,.72);
+    font-size:11px; margin:6px 20px 0; text-shadow:0 1px 3px rgba(0,0,0,.6);
+    font-variant-numeric:tabular-nums;
+  }
+  .zoom-row{
+    position:relative; z-index:2; display:flex; align-items:center; gap:10px;
+    padding:10px 26px 0; color:#fff; font-size:15px;
+  }
+  .zoom-row input{flex:1; accent-color:var(--accent);}
+
   .feedback{
     position:absolute; left:16px; right:16px; bottom:110px; z-index:3;
     border-radius:12px; padding:14px 16px; text-align:left;
@@ -206,9 +217,15 @@
     <div class="corner bl"></div><div class="corner br"></div>
   </div>
   <p class="scan-status" id="scanStatus">Iniciando cámara…</p>
+  <p class="scan-diag" id="scanDiag"></p>
   <div id="feedback" class="feedback" hidden></div>
+  <div class="zoom-row" id="zoomRow" hidden>
+    <span aria-hidden="true">🔍</span>
+    <input type="range" id="zoomInput" min="1" max="4" step="0.1" value="1" aria-label="Zoom">
+  </div>
   <div class="scan-controls">
     <button class="round-btn" id="torchBtn" hidden title="Linterna">🔦</button>
+    <button class="round-btn" id="photoBtn" title="Tomar foto y analizar">📷</button>
     <button class="round-btn close" id="closeBtn" title="Cerrar">✕</button>
   </div>
 </div>
@@ -436,65 +453,251 @@
   }
 
   /* =========================================================
-     6. ESCÁNER DE CÁMARA (ZXing – PDF417)
-  ==========================================================*/
-  var overlay = document.getElementById("scanOverlay");
-  var video = document.getElementById("video");
-  var scanStatus = document.getElementById("scanStatus");
-  var feedback = document.getElementById("feedback");
-  var torchBtn = document.getElementById("torchBtn");
-  var closeBtn = document.getElementById("closeBtn");
+     6. ESCÁNER DE CÁMARA
 
-  var codeReader = null;
-  var scanLocked = false;
-  var torchOn = false;
+     Dos motores de decodificación:
+       1) BarcodeDetector nativo del sistema (Chrome en Android
+          con Google Play Services). Es el que de verdad lee un
+          PDF417 denso de pase de abordar.
+       2) ZXing (JS) como respaldo si el navegador no lo tiene.
+
+     Además se pide video en ALTA RESOLUCIÓN. La versión anterior
+     dejaba que el navegador eligiera (típicamente 640x480), y a
+     esa resolución las barras finas de un PDF417 no se resuelven:
+     la cámara se veía bien pero nunca decodificaba nada.
+  ==========================================================*/
+  var overlay    = document.getElementById("scanOverlay");
+  var video      = document.getElementById("video");
+  var scanStatus = document.getElementById("scanStatus");
+  var scanDiag   = document.getElementById("scanDiag");
+  var feedback   = document.getElementById("feedback");
+  var torchBtn   = document.getElementById("torchBtn");
+  var photoBtn   = document.getElementById("photoBtn");
+  var closeBtn   = document.getElementById("closeBtn");
+  var zoomRow    = document.getElementById("zoomRow");
+  var zoomInput  = document.getElementById("zoomInput");
+
+  var mediaStream = null, videoTrack = null;
+  var nativeDetector = null, zxingReader = null;
+  var engineLabel = "", rafId = null;
+  var busy = false, scanLocked = false, torchOn = false;
+  var attempts = 0, lastDiag = 0;
+
+  function setDiag(extra){
+    var res = video.videoWidth ? (video.videoWidth + "x" + video.videoHeight) : "?";
+    scanDiag.textContent = "Motor: " + (engineLabel || "-") +
+      " \u00b7 Video: " + res +
+      " \u00b7 An\u00e1lisis: " + attempts +
+      (extra ? " \u00b7 " + extra : "");
+  }
+
+  function chooseEngine(){
+    return Promise.resolve()
+      .then(function(){
+        if (!("BarcodeDetector" in window)) return null;
+        return window.BarcodeDetector.getSupportedFormats().then(function(f){
+          if (f && f.indexOf("pdf417") !== -1){
+            nativeDetector = new window.BarcodeDetector({ formats:["pdf417"] });
+            engineLabel = "nativo";
+            return true;
+          }
+          return null;
+        }).catch(function(){ return null; });
+      })
+      .then(function(ok){
+        if (ok) return true;
+        if (typeof ZXing !== "undefined"){
+          zxingReader = new ZXing.BrowserPDF417Reader(150);
+          engineLabel = "ZXing (respaldo)";
+          return true;
+        }
+        return false;
+      });
+  }
+
+  // Se prueban varias combinaciones, de la mejor a la más básica.
+  var CONSTRAINT_SETS = [
+    { video:{ facingMode:{ exact:"environment" }, width:{ ideal:2560 }, height:{ ideal:1440 } } },
+    { video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
+    { video:{ facingMode:"environment" } },
+    { video:true }
+  ];
+
+  function getStream(i){
+    i = i || 0;
+    if (i >= CONSTRAINT_SETS.length) return Promise.reject(new Error("no-stream"));
+    return navigator.mediaDevices.getUserMedia(CONSTRAINT_SETS[i])
+      .catch(function(e){
+        if (e && (e.name === "NotAllowedError" || e.name === "SecurityError")) throw e;
+        return getStream(i + 1);
+      });
+  }
 
   function openScanner(){
     overlay.hidden = false;
-    scanStatus.textContent = "Iniciando cámara…";
     feedback.hidden = true;
     torchBtn.hidden = true; torchOn = false;
+    zoomRow.hidden = true;
+    attempts = 0; scanLocked = false; busy = false;
+    scanDiag.textContent = "";
+    scanStatus.textContent = "Iniciando c\u00e1mara\u2026";
 
-    if (typeof ZXing === "undefined"){
-      scanStatus.textContent = "No se pudo cargar el lector de códigos (sin conexión).";
+    // La cámara SOLO funciona en contexto seguro: https:// o localhost.
+    // Abrir el archivo como file:///... deja navigator.mediaDevices sin definir.
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      scanStatus.innerHTML = "Este navegador no expone la c\u00e1mara a la p\u00e1gina.<br>" +
+        "Ocurre al abrir el archivo directamente (<code>file://</code>): hay que servirlo por " +
+        "<b>https://</b> o <b>localhost</b>. Mientras tanto puedes usar el ingreso manual.";
       return;
     }
-    codeReader = new ZXing.BrowserPDF417Reader(300);
 
-    codeReader.decodeFromVideoDevice(null, video, function(result, err){
-      if (scanLocked) return;
-      if (result){
-        handleDecoded(result.getText());
+    chooseEngine().then(function(ok){
+      if (!ok){
+        scanStatus.textContent = "No hay ning\u00fan lector de c\u00f3digos disponible " +
+          "(el navegador no trae uno nativo y la librer\u00eda no carg\u00f3: revisa la conexi\u00f3n).";
+        return;
       }
-      // los errores "NotFound/Checksum/Format" son normales mientras
-      // no hay un código bien enfocado en cuadro: se ignoran.
-    }).then(function(){
-      scanStatus.textContent = "Apunta al código de barras (PDF417) del pase";
-      setupTorch();
+      setDiag();
+      return getStream(0).then(function(stream){
+        mediaStream = stream;
+        videoTrack  = stream.getVideoTracks()[0];
+        setupTorch();
+        setupZoom();
+        tryContinuousFocus();
+
+        if (nativeDetector){
+          video.srcObject = mediaStream;
+          video.setAttribute("playsinline","");
+          var pl = video.play();
+          if (pl && pl.catch) pl.catch(function(){});
+          scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
+          setDiag();
+          loopNative();
+        } else {
+          zxingReader.decodeFromStream(mediaStream, video, function(result){
+            attempts++;
+            if (Date.now() - lastDiag > 500){ lastDiag = Date.now(); setDiag(); }
+            if (result && !scanLocked) handleDecoded(result.getText());
+          }).then(function(){
+            scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
+          }).catch(function(){
+            scanStatus.textContent = "No se pudo iniciar el lector de respaldo.";
+          });
+        }
+      });
     }).catch(function(e){
-      var msg = "No se pudo acceder a la cámara.";
-      if (e && e.name === "NotAllowedError") msg = "Permiso de cámara denegado. Actívalo en los ajustes del navegador.";
-      else if (e && e.name === "NotFoundError") msg = "No se encontró una cámara en este dispositivo.";
+      var msg = "No se pudo acceder a la c\u00e1mara.";
+      if (e && e.name === "NotAllowedError") msg = "Permiso de c\u00e1mara denegado. Act\u00edvalo en los ajustes del navegador para este sitio.";
+      else if (e && e.name === "NotFoundError") msg = "No se encontr\u00f3 ninguna c\u00e1mara en este dispositivo.";
+      else if (e && e.name === "NotReadableError") msg = "La c\u00e1mara est\u00e1 ocupada por otra app. Ci\u00e9rrala e int\u00e9ntalo de nuevo.";
       scanStatus.textContent = msg;
     });
   }
 
+  function loopNative(){
+    rafId = requestAnimationFrame(loopNative);
+    if (busy || scanLocked || !nativeDetector || video.readyState < 2) return;
+    busy = true;
+    nativeDetector.detect(video).then(function(codes){
+      attempts++;
+      if (Date.now() - lastDiag > 400){ lastDiag = Date.now(); setDiag(); }
+      if (codes && codes.length && !scanLocked) handleDecoded(codes[0].rawValue);
+    }).catch(function(){
+      // frames sin código: normal
+    }).then(function(){ busy = false; });
+  }
+
+  function tryContinuousFocus(){
+    try{
+      if (!videoTrack || !videoTrack.getCapabilities) return;
+      var caps = videoTrack.getCapabilities();
+      if (caps && caps.focusMode && caps.focusMode.indexOf("continuous") !== -1){
+        videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(function(){});
+      }
+    }catch(e){}
+  }
+
   function setupTorch(){
     try{
-      var stream = video.srcObject;
-      if (!stream) return;
-      var track = stream.getVideoTracks()[0];
-      if (!track || !track.getCapabilities) return;
-      var caps = track.getCapabilities();
+      if (!videoTrack || !videoTrack.getCapabilities) return;
+      var caps = videoTrack.getCapabilities();
       if (caps && caps.torch){
         torchBtn.hidden = false;
         torchBtn.onclick = function(){
           torchOn = !torchOn;
-          track.applyConstraints({ advanced:[{ torch: torchOn }] }).catch(function(){});
+          videoTrack.applyConstraints({ advanced:[{ torch: torchOn }] }).catch(function(){});
           torchBtn.classList.toggle("on", torchOn);
         };
       }
     }catch(e){}
+  }
+
+  function setupZoom(){
+    try{
+      if (!videoTrack || !videoTrack.getCapabilities) return;
+      var caps = videoTrack.getCapabilities();
+      if (caps && caps.zoom && caps.zoom.max > caps.zoom.min){
+        zoomRow.hidden = false;
+        zoomInput.min  = caps.zoom.min;
+        zoomInput.max  = caps.zoom.max;
+        zoomInput.step = caps.zoom.step || 0.1;
+        var cur = videoTrack.getSettings ? videoTrack.getSettings().zoom : null;
+        zoomInput.value = cur || caps.zoom.min;
+        zoomInput.oninput = function(){
+          videoTrack.applyConstraints({ advanced:[{ zoom: parseFloat(zoomInput.value) }] }).catch(function(){});
+        };
+      }
+    }catch(e){}
+  }
+
+  /* --- Captura de foto a máxima resolución (plan B manual) --- */
+  function grabBitmap(){
+    return Promise.resolve().then(function(){
+      if (window.ImageCapture && videoTrack){
+        var ic = new window.ImageCapture(videoTrack);
+        return ic.takePhoto()
+          .then(function(blob){ return createImageBitmap(blob); })
+          .catch(function(){ return ic.grabFrame(); });
+      }
+      throw new Error("no-imagecapture");
+    }).catch(function(){
+      var c = document.createElement("canvas");
+      c.width  = video.videoWidth  || 1280;
+      c.height = video.videoHeight || 720;
+      c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+      return createImageBitmap(c);
+    });
+  }
+
+  function decodeStill(){
+    if (scanLocked || !mediaStream) return;
+    scanStatus.textContent = "Analizando foto\u2026";
+    grabBitmap().then(function(bmp){
+      var c = document.createElement("canvas");
+      c.width = bmp.width; c.height = bmp.height;
+      c.getContext("2d").drawImage(bmp, 0, 0);
+      setDiag("foto " + bmp.width + "x" + bmp.height);
+
+      var step = nativeDetector
+        ? nativeDetector.detect(c).then(function(codes){
+            return (codes && codes.length) ? codes[0].rawValue : null;
+          }).catch(function(){ return null; })
+        : Promise.resolve(null);
+
+      return step.then(function(text){
+        if (text || typeof ZXing === "undefined") return text;
+        var r = new ZXing.BrowserPDF417Reader();
+        return r.decodeFromImageUrl(c.toDataURL("image/png"))
+          .then(function(res){ return res.getText(); })
+          .catch(function(){ return null; });
+      });
+    }).then(function(text){
+      if (video.paused){ var pl = video.play(); if (pl && pl.catch) pl.catch(function(){}); }
+      if (text) handleDecoded(text);
+      else scanStatus.textContent = "En esa foto no se ley\u00f3 ning\u00fan PDF417. Ac\u00e9rcate m\u00e1s, aplana el papel y evita reflejos.";
+    }).catch(function(){
+      scanStatus.textContent = "No se pudo capturar la foto.";
+    });
   }
 
   function handleDecoded(rawText){
@@ -506,32 +709,41 @@
     feedback.hidden = false;
     if (res.status === "added"){
       feedback.className = "feedback ok";
-      feedback.innerHTML = "<b>Agregado ✓</b>"+toTitle(res.passenger.nombreCompleto)+
-        (res.passenger.asiento ? " · Asiento "+res.passenger.asiento : "");
+      feedback.innerHTML = "<b>Agregado \u2713</b>"+toTitle(res.passenger.nombreCompleto)+
+        (res.passenger.asiento ? " \u00b7 Asiento "+res.passenger.asiento : "");
     } else if (res.status === "duplicate"){
       feedback.className = "feedback dup";
       feedback.innerHTML = "<b>Ya estaba en la lista</b>"+toTitle(res.passenger.nombreCompleto);
     } else {
       feedback.className = "feedback dup";
-      feedback.innerHTML = "<b>Código no reconocido</b>Esto no parece un pase de abordar IATA (BCBP).";
+      feedback.innerHTML = "<b>C\u00f3digo le\u00eddo, pero no es un pase</b>El c\u00f3digo se decodific\u00f3 bien, " +
+        "pero su contenido no tiene formato IATA BCBP (no empieza por \u201cM1\u201d).";
     }
 
     setTimeout(function(){
       feedback.hidden = true;
       scanLocked = false;
+      if (!overlay.hidden) scanStatus.textContent = "Apunta al c\u00f3digo de barras (PDF417) del pase";
     }, 1700);
   }
 
   function closeScanner(){
     overlay.hidden = true;
-    if (codeReader){
-      try{ codeReader.reset(); }catch(e){}
-      codeReader = null;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    if (zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
+    nativeDetector = null;
+    if (mediaStream){
+      mediaStream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+      mediaStream = null;
     }
+    videoTrack = null;
+    try{ video.srcObject = null; }catch(e){}
+    busy = false; scanLocked = false;
   }
 
   document.getElementById("scanBtn").addEventListener("click", openScanner);
   closeBtn.addEventListener("click", closeScanner);
+  photoBtn.addEventListener("click", decodeStill);
 
   /* =========================================================
      7. INGRESO MANUAL
