@@ -188,6 +188,18 @@
   .modal-actions .secondary{border:1px solid var(--border); background:transparent; color:var(--text);}
 
   /* ---------- Toast ---------- */
+  .modal-card.wide{max-width:520px;}
+  .ocr-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+    max-height:50vh; overflow-y:auto; margin:4px 0 14px;
+  }
+  .ocr-field{display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted);}
+  .ocr-field input{
+    width:100%; padding:8px; border:1px solid var(--border); border-radius:8px;
+    background:var(--panel-2); color:var(--text); font-family:var(--mono); font-size:13px;
+  }
+  .ocr-field.warn span{color:var(--accent); font-weight:600;}
+  .ocr-field.warn input{border-color:var(--accent); background:rgba(185,114,14,.10);}
   .toast{
     position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:70;
     max-width:448px; margin:0 auto; background:var(--panel); border:1px solid var(--border); color:var(--text);
@@ -217,6 +229,7 @@
 
     <div class="toolbar">
       <input id="searchInput" placeholder="Buscar pasajero…" />
+      <button class="btn-ghost" id="ocrBtn">OCR del pase</button>
       <button class="btn-ghost" id="manualBtn">Manual</button>
       <button class="btn-ghost" id="exportBtn">Exportar CSV</button>
       <button class="btn-ghost danger" id="clearBtn">Vaciar</button>
@@ -251,11 +264,26 @@
     <button class="round-btn" id="torchBtn" hidden title="Linterna">🔦</button>
     <button class="round-btn" id="photoBtn" title="Tomar foto y analizar">📷</button>
     <button class="round-btn" id="fileBtn" title="Usar la cámara del sistema o una foto de la galería">🖼</button>
+    <button class="round-btn" id="ocrCamBtn" title="Leer los datos impresos (OCR)">🔤</button>
     <button class="round-btn close" id="closeBtn" title="Cerrar">✕</button>
   </div>
 </div>
 
 <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+<input type="file" id="ocrInput" accept="image/*" capture="environment" hidden />
+
+<!-- Revisión del OCR: el OCR NUNCA agrega solo, siempre pasa por aquí -->
+<div class="modal" id="ocrModal" hidden>
+  <div class="modal-card wide">
+    <h2>Revisar datos leídos del pase</h2>
+    <p id="ocrNote"></p>
+    <div class="ocr-grid" id="ocrForm"></div>
+    <div class="modal-actions">
+      <button class="secondary" id="ocrCancel">Cancelar</button>
+      <button class="primary" id="ocrSubmit">Agregar pasajero</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal ingreso manual -->
 <div class="modal" id="manualModal" hidden>
@@ -357,9 +385,35 @@
     };
   }
 
-  function dedupeKey(p){
-    if (p.ticketNumber && p.ticketConfidence !== "none") return "T:"+p.ticketNumber;
-    return "K:"+p.pnr+"|"+p.aerolinea+p.vuelo+"|"+p.apellidos+"|"+p.nombres;
+  /* El número de tiquete va con 13 dígitos en el código de barras
+     (0 + 12) y con 12 impreso en el pase. Se normaliza a 13 para que
+     un mismo pasajero leído por código y por OCR sea el mismo. */
+  function normTicket(t){
+    t = String(t||"").replace(/\D/g,"");
+    return t.length === 12 ? "0"+t : t;
+  }
+
+  /* Un pasajero puede coincidir por varias llaves. Se compara por
+     conjuntos porque el OCR a veces falla justo en el tiquete: si sólo
+     se usara ésa, un duplicado se colaría. */
+  function keySet(p){
+    var ks = [];
+    var t = p.ticketNumber ? normTicket(p.ticketNumber) : "";
+    if (t && p.ticketConfidence !== "none") ks.push("T:"+t);
+    var nm = ((p.apellidos||"")+"|"+(p.nombres||"")).toUpperCase().replace(/\s+/g,"");
+    var fl = ((p.aerolinea||"")+(p.vuelo||"")).toUpperCase();
+    if (nm.replace(/\|/g,"")) ks.push("N:"+nm+"|"+fl);
+    if (p.pnr) ks.push("P:"+p.pnr+"|"+nm);
+    return ks;
+  }
+  function keysOf(x){
+    if (x._keys && x._keys.length) return x._keys;
+    return x._key ? [x._key] : [];
+  }
+  function isDuplicate(keys){
+    return state.passengers.some(function(x){
+      return keysOf(x).some(function(k){ return keys.indexOf(k) !== -1; });
+    });
   }
 
   function toTitle(s){
@@ -440,6 +494,7 @@
       if (p.asiento) bits.push("Asiento "+p.asiento);
       if (p.pnr) bits.push("PNR "+p.pnr);
       if (p.ticketNumber) bits.push("Tkt "+p.ticketNumber);
+      if (p.source === "ocr") bits.push("OCR");
       meta.textContent = bits.join("  ·  ");
       info.appendChild(name); info.appendChild(meta);
 
@@ -466,21 +521,46 @@
   /* =========================================================
      5. AGREGAR PASAJERO (con deduplicación)
   ==========================================================*/
-  function addPassengerFromRaw(raw){
-    var p = parseBCBP(raw);
-    if (!p.valid){
-      return { status:"invalid" };
-    }
-    var key = dedupeKey(p);
-    var exists = state.passengers.some(function(x){ return x._key === key; });
-    if (exists){
-      return { status:"duplicate", passenger:p };
-    }
-    p._key = key;
+  function commit(p){
+    var keys = keySet(p);
+    if (!keys.length) return { status:"invalid" };
+    if (isDuplicate(keys)) return { status:"duplicate", passenger:p };
+    p._keys = keys; p._key = keys[0];
     p.scannedAt = new Date().toISOString();
     state.passengers.push(p);
     saveState(); render();
     return { status:"added", passenger:p };
+  }
+
+  function addPassengerFromRaw(raw){
+    var p = parseBCBP(raw);
+    if (!p.valid) return { status:"invalid" };
+    p.source = "codigo";
+    return commit(p);
+  }
+
+  /* Alta desde campos sueltos: es la puerta que usa el OCR después de
+     que el agente confirma en el formulario de revisión. */
+  function addPassengerFromFields(f, source){
+    var parts = String(f.nombre||"").split("/");
+    var apellidos = (parts[0]||"").trim();
+    var nombres = parts.slice(1).join(" ").trim();
+    if (!apellidos && !nombres) return { status:"invalid" };
+    var p = {
+      valid:true, raw:"", source: source || "ocr",
+      apellidos:apellidos, nombres:nombres,
+      nombreCompleto: nombres ? (nombres+" "+apellidos) : apellidos,
+      pnr: f.pnr || "",
+      origen: f.origen || "", destino: f.destino || "",
+      aerolinea: f.aerolinea || "", vuelo: f.vuelo || "",
+      vueloCompleto: ((f.aerolinea||"")+" "+(f.vuelo||"")).trim(),
+      clase: f.clase || "", asiento: f.asiento || "",
+      documento: f.documento || "", fechaVuelo: f.fecha || "", horaVuelo: f.hora || "",
+      horaEmbarque: f.horaEmbarque || "", control: f.control || "", agente: f.agente || "",
+      ticketNumber: f.tiquete ? normTicket(f.tiquete) : null,
+      ticketConfidence: f.tiquete ? "ocr" : "none"
+    };
+    return commit(p);
   }
 
   /* =========================================================
@@ -532,6 +612,7 @@
   var engineLabel = "", rafId = null;
   var busy = false, scanLocked = false, torchOn = false;
   var attempts = 0, lastDiag = 0, lastTick = 0, variantIdx = 0;
+  var scanStart = 0, hintShown = false;
   var lastHit = "";
 
   // Lienzo de trabajo reutilizado (evita crear uno por cuadro).
@@ -802,6 +883,14 @@
 
     var srcPx = roi ? Math.round(roi.w) : video.videoWidth;
 
+    // Si lleva un rato sin leer, no dejar al agente adivinando:
+    // hay dos rutas más y conviene decirlo en pantalla.
+    if (!hintShown && !lastHit && Date.now() - scanStart > 12000){
+      hintShown = true;
+      scanStatus.innerHTML = "No logro leer el c\u00f3digo. Sube el zoom y toca la pantalla para reenfocar.<br>" +
+        "Si sigue sin leer, usa <b>\ud83d\udd24</b> para leer los <b>datos impresos</b> del pase.";
+    }
+
     decodeCanvas(canvas).then(function(text){
       attempts++;
       if (text && !scanLocked){
@@ -897,7 +986,7 @@
     feedback.hidden = true;
     torchBtn.hidden = true; torchOn = false;
     zoomRow.hidden = true; zoomQuick.hidden = true;
-    attempts = 0; variantIdx = 0; lastHit = "";
+    attempts = 0; variantIdx = 0; lastHit = ""; scanStart = Date.now(); hintShown = false;
     scanLocked = false; busy = false;
     scanDiag.textContent = "";
     scanStatus.textContent = "Iniciando c\u00e1mara\u2026";
@@ -1102,6 +1191,380 @@
   video.addEventListener("click", refocus);
 
   /* =========================================================
+     6B. RESPALDO POR OCR — leer los datos IMPRESOS del pase
+
+     Cuando el PDF417 no se deja leer (impresión gastada, papel
+     arrugado, código demasiado pequeño para la cámara), todos los
+     datos que necesita el manifiesto están impresos en claro en el
+     mismo pase. Este módulo los lee con Tesseract.
+
+     REGLA DE DISEÑO: el OCR NUNCA agrega un pasajero por su cuenta.
+     Siempre abre un formulario de revisión con lo que leyó, para que
+     el agente confirme o corrija. Medido sobre una foto real de un
+     pase de Satena: el nombre, el documento, el vuelo, la fecha, la
+     hora, la ruta y el equipaje salieron correctos en las tres
+     pasadas, pero el NÚMERO DE TIQUETE salió distinto entre pasadas
+     (…279858 vs …379858) y el asiento se confundió entre 5B y 58.
+     Con dígitos de ~14 px de alto eso no se arregla con software.
+
+     Mitigaciones implementadas:
+       · Tres pasadas con preprocesado distinto y voto por campo.
+       · Validación por campo: entre los candidatos se prefiere el que
+         cumple el formato esperado (así "5B" le gana a "58").
+       · Los campos donde las pasadas no coincidieron se marcan con ⚠
+         en el formulario para que el agente los mire sí o sí.
+  ==========================================================*/
+
+  // Las ciudades vienen impresas con nombre, no con código IATA.
+  // Amplía este diccionario con las rutas que uses.
+  var CITY_TO_IATA = {
+    "SAN GIL":"LPZ", "MEDELLIN":"EOH", "BOGOTA":"BOG",
+    "VILLAVICENCIO":"VVC", "PROVIDENCIA":"PVA", "SAN ANDRES":"ADZ"
+  };
+
+  var TESS_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+  var tessLoading = null;
+
+  // Se carga sólo cuando se usa: son ~3 MB entre librería y datos de
+  // idioma, y no tiene sentido pagarlos si el código de barras sí lee.
+  function loadTesseract(){
+    if (window.Tesseract) return Promise.resolve(true);
+    if (tessLoading) return tessLoading;
+    tessLoading = new Promise(function(resolve){
+      var s = document.createElement("script");
+      s.src = TESS_URL;
+      s.onload  = function(){ resolve(!!window.Tesseract); };
+      s.onerror = function(){ resolve(false); };
+      document.head.appendChild(s);
+    });
+    return tessLoading;
+  }
+
+  /* --- Preprocesado --- */
+  function toCanvas(src, w, h, targetW, threshold){
+    var f = targetW / w;
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w*f));
+    c.height = Math.max(1, Math.round(h*f));
+    var x = c.getContext("2d", { willReadFrequently:true });
+    x.imageSmoothingEnabled = true;
+    try{ x.imageSmoothingQuality = "high"; }catch(e){}
+    x.drawImage(src, 0, 0, w, h, 0, 0, c.width, c.height);
+    if (threshold){
+      var d = x.getImageData(0,0,c.width,c.height), p = d.data;
+      var hist = new Array(256); for (var q=0;q<256;q++) hist[q]=0;
+      var g, i;
+      for (i=0;i<p.length;i+=4){
+        g = (p[i]*299 + p[i+1]*587 + p[i+2]*114) / 1000 | 0;
+        p[i]=p[i+1]=p[i+2]=g; hist[g]++;
+      }
+      var t = otsu(hist, (p.length/4)|0);
+      for (i=0;i<p.length;i+=4){
+        var v = p[i] < t ? 0 : 255;
+        p[i]=p[i+1]=p[i+2]=v;
+      }
+      x.putImageData(d,0,0);
+    }
+    return c;
+  }
+
+  // Umbral de Otsu: se adapta al contraste real del papel térmico,
+  // que varía mucho más que un umbral fijo.
+  function otsu(hist, total){
+    var sum = 0, i;
+    for (i=0;i<256;i++) sum += i*hist[i];
+    var sumB=0, wB=0, wF=0, mB, mF, max=0, between, thr=128;
+    for (i=0;i<256;i++){
+      wB += hist[i]; if (wB===0) continue;
+      wF = total - wB; if (wF===0) break;
+      sumB += i*hist[i];
+      mB = sumB/wB; mF = (sum-sumB)/wF;
+      between = wB*wF*(mB-mF)*(mB-mF);
+      if (between > max){ max = between; thr = i; }
+    }
+    return thr;
+  }
+
+  /* --- Parser de los campos impresos --- */
+  function ocrLines(text){
+    return String(text||"").toUpperCase()
+      .replace(/[\u2013\u2014]/g,"-")
+      .split(/\n+/)
+      .map(function(l){ return l.replace(/\s+/g," ").trim(); })
+      .filter(function(l){ return l.length>0; });
+  }
+  function findIdx(L,re,from){ for(var i=(from||0);i<L.length;i++) if(re.test(L[i])) return i; return -1; }
+  function nextMatch(L,start,re,span){
+    span = span||4;
+    for(var i=start;i<Math.min(L.length,start+span);i++){ var m=L[i].match(re); if(m) return m; }
+    return null;
+  }
+
+  function parseOCR(text){
+    var L = ocrLines(text), o = {}, i, m, j;
+
+    i = findIdx(L,/PASSENGER\s*NAME/);
+    if (i<0) i = findIdx(L,/NOMBRE\s+DE.?\s*PASA[JI]ER/);
+    if (i>=0){
+      for (j=i+1;j<Math.min(L.length,i+4);j++){
+        if (/^[A-ZÑ][A-ZÑ .'-]*\/[A-ZÑ][A-ZÑ .'-]*$/.test(L[j])){
+          o.nombre = L[j].replace(/\s*\/\s*/,"/"); break;
+        }
+      }
+    }
+
+    i = findIdx(L,/IDENTIFICA/);
+    if (i>=0){ m = nextMatch(L,i+1,/^([A-Z]{0,3}\s?\d{5,15})$/,3); if(m) o.documento = m[1].replace(/\s/g,""); }
+
+    for (var k=0;k<L.length;k++){
+      m = L[k].match(/^([A-Z0-9]{2})\s*(\d{2,4})\s+(\d{1,2}[A-Z]{3})\s+(\d{3,4})\s+([A-Z])[A-Z]?$/);
+      if (m){ o.aerolinea=m[1]; o.vuelo=m[2]; o.fecha=m[3]; o.hora=m[4]; o.clase=m[5]; break; }
+    }
+
+    i = findIdx(L,/DE\s*\(\s*FROM|FROM\)\s*\/\s*A\s*\(|A\s*\(\s*T[DO]\s*\)/);
+    if (i>=0){
+      for (j=i+1;j<Math.min(L.length,i+4);j++){
+        m = L[j].match(/^([A-ZÑ .'-]{3,})\s*\/\s*([A-ZÑ .'-]{3,})$/);
+        if (m && !/\d/.test(L[j])){
+          o.ciudadOrigen = m[1].trim(); o.ciudadDestino = m[2].trim();
+          o.origen  = CITY_TO_IATA[o.ciudadOrigen]  || "";
+          o.destino = CITY_TO_IATA[o.ciudadDestino] || "";
+          break;
+        }
+      }
+    }
+
+    // OJO: sólo se busca DESPUÉS de la etiqueta E-TICKET. La línea
+    // gratuita del encabezado (019003317100) también tiene 12 dígitos
+    // y una búsqueda global la confundiría con el tiquete.
+    i = findIdx(L,/E\s*-?\s*TI[CG]/);
+    if (i>=0){ m = nextMatch(L,i+1,/(\d{11,14})/,3); if(m) o.tiquete = m[1]; }
+
+    for (k=0;k<L.length;k++){
+      m = L[k].match(/(\d{1,2})\s*\/\s*(\d{2,3})\s*KG/);
+      if (m){ o.equipajePiezas=m[1]; o.equipajeKg=m[2]; break; }
+    }
+
+    i = findIdx(L,/HORA\s+DE\s+EMBARQUE|B.?ARDING\s+TIME/);
+    if (i>=0){ m = nextMatch(L,i+1,/^(\d{3,4})$/,3); if(m) o.horaEmbarque=m[1]; }
+
+    var ci = findIdx(L,/CONTROL/), si = findIdx(L,/ASIENT|SEAT/);
+    var from = Math.max(ci,si);
+    if (from>=0){
+      m = nextMatch(L,from+1,/^(\d{2,4})\s+(\d{1,3}\s?[A-Z0-9])$/,4);
+      if (m){ o.control=m[1]; o.asiento=m[2].replace(/\s/g,""); }
+      else { m = nextMatch(L,from+1,/^(\d{1,3}[A-Z])$/,4); if(m) o.asiento=m[1]; }
+    }
+
+    for (k=0;k<L.length;k++){
+      m = L[k].match(/GATE\s+CONTROL\s+([A-Z0-9]{5,12})$/) || L[k].match(/^AGENTE\s+([A-Z0-9]{5,12})$/);
+      if (m){ o.agente=m[1]; break; }
+    }
+    if (!o.agente){
+      i = findIdx(L,/^AGENTE$/);
+      if (i>=0){ m = nextMatch(L,i+1,/^([A-Z0-9]{5,12})$/,3); if(m) o.agente=m[1]; }
+    }
+
+    return o;
+  }
+
+  /* --- Validación y voto entre pasadas --- */
+  var OCR_FIELDS = [
+    { k:"nombre",       lbl:"Nombre (APELLIDOS/NOMBRES)", re:/^[A-ZÑ .'-]+\/[A-ZÑ .'-]+$/ },
+    { k:"documento",    lbl:"Documento",                  re:/^[A-Z]{0,3}\d{5,15}$/ },
+    { k:"aerolinea",    lbl:"Aerolínea",                  re:/^[A-Z0-9]{2}$/ },
+    { k:"vuelo",        lbl:"Vuelo",                      re:/^\d{2,4}$/ },
+    { k:"fecha",        lbl:"Fecha",                      re:/^\d{1,2}[A-Z]{3}$/ },
+    { k:"hora",         lbl:"Hora",                       re:/^\d{3,4}$/ },
+    { k:"clase",        lbl:"Clase",                      re:/^[A-Z]$/ },
+    { k:"origen",       lbl:"Origen (IATA)",              re:/^[A-Z]{3}$/ },
+    { k:"destino",      lbl:"Destino (IATA)",             re:/^[A-Z]{3}$/ },
+    { k:"asiento",      lbl:"Asiento",                    re:/^\d{1,3}[A-Z]$/ },
+    { k:"tiquete",      lbl:"N.º de tiquete",             re:/^\d{12}$/ },
+    { k:"horaEmbarque", lbl:"Hora de embarque",           re:/^\d{3,4}$/ },
+    { k:"control",      lbl:"Control",                    re:/^\d{2,4}$/ },
+    { k:"agente",       lbl:"Agente",                     re:/^[A-Z0-9]{5,12}$/ }
+  ];
+
+  // El OCR confunde letras con dígitos en campos cortos. En el asiento
+  // la última posición SIEMPRE es letra, así que se puede reparar.
+  var DIGIT_TO_LETTER = { "8":"B", "0":"D", "1":"I", "5":"S", "6":"G", "2":"Z", "4":"A" };
+  function repair(k, v){
+    if (!v) return v;
+    if (k === "asiento"){
+      var m = v.match(/^(\d{1,3})([0-9])$/);
+      if (m && DIGIT_TO_LETTER[m[2]]) return m[1] + DIGIT_TO_LETTER[m[2]];
+    }
+    return v;
+  }
+
+  // Entre los candidatos de las pasadas se prefiere el que cumple el
+  // formato; entre los válidos, el más repetido. Si no todos coinciden,
+  // el campo se marca para revisión.
+  function mergeField(field, values){
+    var vals = values.map(function(v){ return repair(field.k, v); })
+                     .filter(function(v){ return v != null && v !== ""; });
+    if (!vals.length) return { value:"", flag:true, reason:"no se encontró" };
+    var valid = vals.filter(function(v){ return field.re.test(v); });
+    var pool = valid.length ? valid : vals;
+    var count = {}, best = pool[0], bestN = 0;
+    pool.forEach(function(v){ count[v]=(count[v]||0)+1; if(count[v]>bestN){bestN=count[v];best=v;} });
+    var allSame = vals.every(function(v){ return v === vals[0]; });
+    var ok = allSame && valid.length === vals.length && vals.length === values.length;
+    return {
+      value: best,
+      flag: !ok,
+      reason: !valid.length ? "formato dudoso" : (!allSame ? "las pasadas no coinciden" : "falta en alguna pasada")
+    };
+  }
+
+  /* --- Ejecutar el OCR sobre una imagen --- */
+  function runOCR(src, w, h, onStatus){
+    return loadTesseract().then(function(ok){
+      if (!ok) throw new Error("no-tesseract");
+      onStatus("Preparando el lector de texto…");
+      return window.Tesseract.createWorker("eng");
+    }).then(function(worker){
+      // Tres preprocesados distintos: el mismo pase se lee diferente
+      // según la escala y el umbral, y eso es justo lo que permite votar.
+      var variants = [
+        { w: Math.min(w, 2600), th:false },
+        { w: 1800,              th:false },
+        { w: 1800,              th:true  }
+      ];
+      var texts = [], idx = 0;
+      function step(){
+        if (idx >= variants.length) return worker.terminate().then(function(){ return texts; });
+        var v = variants[idx++];
+        onStatus("Leyendo el texto del pase… (" + idx + "/" + variants.length + ")");
+        var c = toCanvas(src, w, h, v.w, v.th);
+        return worker.recognize(c)
+          .then(function(r){ texts.push(r.data.text || ""); })
+          .catch(function(){ texts.push(""); })
+          .then(step);
+      }
+      return step();
+    }).then(function(texts){
+      var parsed = texts.map(parseOCR);
+      var merged = {}, flags = {}, anything = false;
+      OCR_FIELDS.forEach(function(f){
+        var r = mergeField(f, parsed.map(function(p){ return p[f.k]; }));
+        merged[f.k] = r.value; flags[f.k] = r;
+        if (r.value) anything = true;
+      });
+      // las ciudades sólo sirven para mostrar, no se votan
+      parsed.forEach(function(p){
+        if (!merged.ciudadOrigen && p.ciudadOrigen) merged.ciudadOrigen = p.ciudadOrigen;
+        if (!merged.ciudadDestino && p.ciudadDestino) merged.ciudadDestino = p.ciudadDestino;
+      });
+      return { fields:merged, flags:flags, ok:anything, rawTexts:texts };
+    });
+  }
+
+  /* --- Formulario de revisión --- */
+  var ocrModal   = document.getElementById("ocrModal");
+  var ocrForm    = document.getElementById("ocrForm");
+  var ocrNote    = document.getElementById("ocrNote");
+  var ocrSubmit  = document.getElementById("ocrSubmit");
+  var ocrCancel  = document.getElementById("ocrCancel");
+
+  function openReview(result){
+    ocrForm.innerHTML = "";
+    var nFlag = 0;
+    OCR_FIELDS.forEach(function(f){
+      var r = result.flags[f.k];
+      var wrap = document.createElement("label");
+      wrap.className = "ocr-field" + (r.flag ? " warn" : "");
+      var lab = document.createElement("span");
+      lab.textContent = f.lbl + (r.flag ? "  ⚠" : "  ✓");
+      lab.title = r.flag ? r.reason : "las tres pasadas coincidieron";
+      var inp = document.createElement("input");
+      inp.type = "text"; inp.value = r.value || "";
+      inp.dataset.k = f.k;
+      inp.autocapitalize = "characters"; inp.autocomplete = "off"; inp.spellcheck = false;
+      wrap.appendChild(lab); wrap.appendChild(inp);
+      ocrForm.appendChild(wrap);
+      if (r.flag) nFlag++;
+    });
+    var city = (result.fields.ciudadOrigen||"") + (result.fields.ciudadDestino ? " → "+result.fields.ciudadDestino : "");
+    ocrNote.innerHTML = "Revisa antes de agregar. " +
+      (nFlag ? "<b>"+nFlag+" campo(s) marcados con ⚠</b> porque las pasadas no coincidieron o el formato es dudoso." :
+               "Todas las pasadas coincidieron, pero verifica igual.") +
+      (city ? "<br>Ruta impresa: <b>"+city+"</b>" : "");
+    ocrModal.hidden = false;
+  }
+
+  function collectReview(){
+    var o = {};
+    Array.prototype.forEach.call(ocrForm.querySelectorAll("input"), function(inp){
+      o[inp.dataset.k] = (inp.value||"").trim().toUpperCase();
+    });
+    return o;
+  }
+
+  ocrCancel.addEventListener("click", function(){ ocrModal.hidden = true; });
+  ocrSubmit.addEventListener("click", function(){
+    var f = collectReview();
+    if (!f.nombre || f.nombre.indexOf("/") === -1){
+      showToast("El nombre debe ir como APELLIDOS/NOMBRES");
+      return;
+    }
+    var res = addPassengerFromFields(f, "ocr");
+    ocrModal.hidden = true;
+    if (res.status === "added") showToast("Agregado (OCR): "+toTitle(res.passenger.nombreCompleto));
+    else showToast("Ese pasajero ya estaba en la lista");
+  });
+
+  /* --- Lanzar el OCR desde una imagen --- */
+  var ocrBusy = false;
+
+  function ocrFromSource(src, w, h, setStatus){
+    if (ocrBusy) return Promise.resolve();
+    ocrBusy = true;
+    return runOCR(src, w, h, setStatus).then(function(result){
+      ocrBusy = false;
+      if (!result.ok){
+        setStatus("No se reconoció ningún dato del pase en esa imagen. Repite la foto más de cerca, con el pase completo, plano y bien iluminado.");
+        return;
+      }
+      setStatus("Datos leídos. Revísalos antes de agregar.");
+      openReview(result);
+    }).catch(function(e){
+      ocrBusy = false;
+      setStatus(String(e && e.message) === "no-tesseract"
+        ? "No se pudo cargar el lector de texto (revisa la conexión)."
+        : "Falló la lectura de texto.");
+    });
+  }
+
+  function ocrFromFile(file){
+    if (!file) return;
+    showToast("Leyendo el pase…");
+    createImageBitmap(file).then(function(bmp){
+      return ocrFromSource(bmp, bmp.width, bmp.height, showToast);
+    }).catch(function(){ showToast("No se pudo leer esa imagen."); });
+  }
+
+  // Desde el escáner: toma una foto a resolución de sensor y la pasa al OCR.
+  function ocrFromCamera(){
+    if (!mediaStream) return;
+    scanStatus.textContent = "Tomando foto para leer el texto…";
+    grabBitmap().then(function(bmp){
+      return ocrFromSource(bmp, bmp.width, bmp.height, function(m){ scanStatus.textContent = m; });
+    }).catch(function(){ scanStatus.textContent = "No se pudo capturar la foto."; });
+  }
+
+  var ocrInput = document.getElementById("ocrInput");
+  document.getElementById("ocrBtn").addEventListener("click", function(){ ocrInput.click(); });
+  ocrInput.addEventListener("change", function(){
+    var f = ocrInput.files && ocrInput.files[0];
+    ocrInput.value = "";
+    ocrFromFile(f);
+  });
+  document.getElementById("ocrCamBtn").addEventListener("click", ocrFromCamera);
+
+
+  /* =========================================================
      7. INGRESO MANUAL
   ==========================================================*/
   var manualModal = document.getElementById("manualModal");
@@ -1138,7 +1601,7 @@
      9. EXPORTAR CSV
   ==========================================================*/
   function buildCSV(){
-    var header = ["Nombre completo","Apellidos","Nombres","PNR","Origen","Destino","Aerolinea","Vuelo","Clase","Asiento","Numero de tiquete","Hora de escaneo"];
+    var header = ["Nombre completo","Apellidos","Nombres","Documento","PNR","Origen","Destino","Aerolinea","Vuelo","Clase","Asiento","Numero de tiquete","Fuente","Hora de escaneo"];
     var esc = function(v){
       v = (v==null?"":String(v));
       return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
@@ -1146,9 +1609,9 @@
     var lines = [header.map(esc).join(",")];
     state.passengers.forEach(function(p){
       lines.push([
-        p.nombreCompleto,p.apellidos,p.nombres,p.pnr,p.origen,p.destino,
+        p.nombreCompleto,p.apellidos,p.nombres,p.documento||"",p.pnr,p.origen,p.destino,
         p.aerolinea,p.vuelo,CLASSES[p.clase]||p.clase,p.asiento,p.ticketNumber||"",
-        p.scannedAt||""
+        p.source||"codigo",p.scannedAt||""
       ].map(esc).join(","));
     });
     return lines.join("\r\n");
