@@ -127,6 +127,15 @@ input:focus,select:focus{outline:3px solid var(--ink);outline-offset:-3px}
 #stage video,#stage img{width:100%;height:100%;object-fit:contain;display:block}
 #stage .ph{padding:18px;text-align:center;font-size:12px;color:var(--ink-soft)}
 .guide{position:absolute;inset:10% 12%;border:3px dashed var(--ink);pointer-events:none;opacity:.55}
+.guideName{position:absolute;inset:34% 6% 38% 6%;border:3px dashed var(--ink);pointer-events:none;opacity:.9;background:rgba(255,255,0,.08)}
+.guideName-tag{position:absolute;left:0;top:-22px;font-size:10px;font-weight:700;background:var(--bar);color:var(--bar-ink);padding:2px 5px;white-space:nowrap}
+.batchWrap{border:2px solid var(--ink);background:var(--paper);padding:10px;margin-top:10px}
+.batchCount{font-weight:700;margin:0 0 8px}
+.batchFeed{max-height:180px;overflow:auto;border:2px solid var(--ink)}
+.batchItem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 7px;border-bottom:2px solid var(--ink);font-size:12px;background:var(--paper)}
+.batchItem:last-child{border-bottom:0}
+.batchItem.dup{color:var(--ink-soft)}
+.batchStatus{font-size:12px;font-weight:700;margin:0 0 8px;padding:6px 8px;border:2px solid var(--ink);background:var(--panel-2)}
 .bar{border:3px solid var(--ink);height:22px;background:var(--paper);margin:10px 0;position:relative}
 .bar>i{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,var(--ink) 0 8px,transparent 8px 12px)}
 .bar>span{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:700}
@@ -210,6 +219,9 @@ pre{margin:0;padding:8px;font:11px/1.35 "Courier New",monospace;white-space:pre-
         <img id="shot" alt="Pase capturado" style="display:none">
         <div class="ph" id="stagePh">Encuadra el pase completo, en vertical, sobre fondo oscuro y con buena luz. La letra impresa debe verse nítida.</div>
         <div class="guide" id="guide" style="display:none"></div>
+        <div class="guideName" id="guideName" style="display:none">
+          <span class="guideName-tag">NOMBRE DE PASAJERO / PASSENGER NAME aquí</span>
+        </div>
       </div>
 
       <button class="btn primary wide" id="btnFile">Tomar foto con la cámara</button>
@@ -217,6 +229,9 @@ pre{margin:0;padding:8px;font:11px/1.35 "Courier New",monospace;white-space:pre-
       <div class="row no-print">
         <button class="btn" id="btnCam">Cámara en vivo</button>
         <button class="btn" id="btnShoot" disabled>Capturar</button>
+      </div>
+      <div class="row no-print" style="margin-top:8px">
+        <button class="btn primary wide" id="btnBatch" disabled>Escanear varios nombres (lote, sin salir)</button>
       </div>
 
       <div class="chk" style="margin-top:12px">
@@ -226,11 +241,24 @@ pre{margin:0;padding:8px;font:11px/1.35 "Courier New",monospace;white-space:pre-
 
       <div class="bar" id="progWrap" style="display:none"><i id="progFill"></i><span id="progTxt">0%</span></div>
       <div class="muted" id="ocrNote"></div>
+
+      <div class="batchWrap no-print" id="batchPanel" style="display:none">
+        <div class="row">
+          <div><label for="batchFlight">Vuelo (opcional, se aplica a todos)</label><input type="text" id="batchFlight" placeholder="9R8840"></div>
+          <div><label for="batchDate">Fecha (opcional)</label><input type="text" id="batchDate" placeholder="18SEP"></div>
+        </div>
+        <p class="muted">Acercá cada pase para que <strong>NOMBRE DE PASAJERO / PASSENGER NAME</strong> y el nombre queden dentro del recuadro amarillo. Se agregan solos, uno por uno, sin apagar la cámara.</p>
+        <div class="batchStatus" id="batchStatusTxt">Buscando nombre…</div>
+        <div class="batchCount" id="batchCount">Agregados en este lote: 0</div>
+        <div class="batchFeed" id="batchFeed"></div>
+        <button class="btn primary wide" id="btnBatchDone" style="margin-top:10px">Terminar lote y ver listado</button>
+      </div>
     </div>
 
     <div class="card">
       <h2>Cómo funciona</h2>
-      <p class="muted">La app lee el texto impreso del pase (no el código PDF417, que en este formato es demasiado pequeño para la cámara de un celular). El reconocimiento nunca es perfecto: <strong>siempre</strong> vas a ver los datos en un formulario para corregirlos antes de sumarlos al listado.</p>
+      <p class="muted"><strong>Tomar foto / cámara en vivo + Capturar:</strong> lee el pase completo (nombre, e-ticket, vuelo, fecha, asiento, etc.) y siempre te muestra un formulario para corregir antes de sumarlo.</p>
+      <p class="muted"><strong>Escanear varios nombres (lote):</strong> pensado para la fila de embarque. Prende la cámara y lee <em>solo</em> el nombre debajo de "NOMBRE DE PASAJERO / PASSENGER NAME" dentro del recuadro amarillo, una y otra vez, agregando a cada pasajero al listado sin salir de la cámara ni tocar nada. Al ser un recorte chico y solo texto grande, es mucho más rápido que leer el pase entero.</p>
       <p class="muted">Todo se procesa en el celular y se guarda solo en este navegador. Nada se envía a un servidor.</p>
     </div>
   </section>
@@ -372,6 +400,36 @@ function toDigits(s){
                   .replace(/B/g,"8").replace(/Z/g,"2").replace(/G/g,"6").replace(/[^0-9]/g,"");
 }
 
+/* nombre: APELLIDO/NOMBRE, sin espacio antes de la barra, sin digitos */
+function nameLineOk(l){
+  if(NOISE.test(l) || LABELS.test(l) || l.indexOf("/")<0) return null;
+  if((l.match(/\d/g)||[]).length > 2) return null;
+  var f = l.replace(/0/g,"O").replace(/1/g,"I").replace(/5/g,"S")
+           .replace(/8/g,"B").replace(/6/g,"G").replace(/2/g,"Z");
+  var m = f.match(/^([A-ZÑ][A-ZÑ.'-]+)\/([A-ZÑ][A-ZÑ .'-]+)$/);
+  return m ? (m[1].trim()+"/"+m[2].trim()) : null;
+}
+function toLines(text){
+  var clean = String(text||"").toUpperCase().replace(/[‘’`´]/g,"'").replace(/[—–]/g,"-");
+  return clean.split(/\n+/).map(function(l){ return l.replace(/\s+/g," ").trim(); })
+              .filter(function(l){ return l.length>0; });
+}
+/* usada tanto por el analisis completo como por el escaneo en vivo de solo-nombre */
+function extractName(text){
+  var lines = toLines(text);
+  function idx(re,from){ for(var i=(from||0);i<lines.length;i++){ if(re.test(lines[i])) return i; } return -1; }
+  function near(i,n,test){
+    for(var k=i;k<Math.min(i+(n||3),lines.length);k++){ var v=test(lines[k]); if(v) return v; }
+    return null;
+  }
+  var i = idx(/PASSENGER\s*NAME|NOMBRE\s*DE\s*PASAJERO/);
+  var name = i>=0 ? near(i+1,3,nameLineOk) : null;
+  if(!name){
+    for(var a=0;a<lines.length;a++){ var v=nameLineOk(lines[a]); if(v){ name=v; break; } }
+  }
+  return name || "";
+}
+
 function parsePass(text){
   var out = {name:"",eticket:"",flight:"",date:"",doc:"",seat:"",time:"",cls:"",from:"",to:"",bagPcs:"",bagKg:""};
   if(!text) return out;
@@ -385,20 +443,7 @@ function parsePass(text){
     return null;
   }
 
-  /* nombre: APELLIDO/NOMBRE, sin espacio antes de la barra, sin digitos */
-  var nameOk = function(l){
-    if(NOISE.test(l) || LABELS.test(l) || l.indexOf("/")<0) return null;
-    if((l.match(/\d/g)||[]).length > 2) return null;
-    var f = l.replace(/0/g,"O").replace(/1/g,"I").replace(/5/g,"S")
-             .replace(/8/g,"B").replace(/6/g,"G").replace(/2/g,"Z");
-    var m = f.match(/^([A-ZÑ][A-ZÑ.'-]+)\/([A-ZÑ][A-ZÑ .'-]+)$/);
-    return m ? (m[1].trim()+"/"+m[2].trim()) : null;
-  };
-  var i = idx(/PASSENGER\s*NAME|NOMBRE\s*DE\s*PASAJERO/);
-  if(i>=0) out.name = near(i+1,3,nameOk) || "";
-  if(!out.name){
-    for(var a=0;a<lines.length;a++){ var v=nameOk(lines[a]); if(v){ out.name=v; break; } }
-  }
+  out.name = extractName(text);
 
   /* e-ticket */
   i = idx(/E\s*-?\s*T\s*I\s*C\s*K\s*E\s*T/);
@@ -482,6 +527,28 @@ function parsePass(text){
 }
 
 /* ---------- imagen ---------- */
+function binarize(cv){
+  var cx = cv.getContext("2d", {willReadFrequently:true});
+  var im = cx.getImageData(0,0,cv.width,cv.height), p = im.data, hist = new Array(256).fill(0), i;
+  for(i=0;i<p.length;i+=4){
+    var g = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114)|0;
+    p[i]=p[i+1]=p[i+2]=g; hist[g]++;
+  }
+  var total = p.length/4, sum=0, sumB=0, wB=0, best=0, thr=128;
+  for(i=0;i<256;i++) sum += i*hist[i];
+  for(i=0;i<256;i++){
+    wB += hist[i]; if(!wB) continue;
+    var wF = total-wB; if(!wF) break;
+    sumB += i*hist[i];
+    var mB = sumB/wB, mF = (sum-sumB)/wF, between = wB*wF*(mB-mF)*(mB-mF);
+    if(between>best){ best=between; thr=i; }
+  }
+  for(i=0;i<p.length;i+=4){
+    var v = p[i] > thr ? 255 : 0;
+    p[i]=p[i+1]=p[i+2]=v;
+  }
+  cx.putImageData(im,0,0);
+}
 function prepare(srcEl, bw){
   var cv = $("#work"), cx = cv.getContext("2d", {willReadFrequently:true});
   var w = srcEl.videoWidth || srcEl.naturalWidth || srcEl.width;
@@ -490,28 +557,38 @@ function prepare(srcEl, bw){
   var max = 1500, sc = Math.min(1, max/Math.max(w,h));
   cv.width = Math.round(w*sc); cv.height = Math.round(h*sc);
   cx.drawImage(srcEl,0,0,cv.width,cv.height);
-  if(bw){
-    var im = cx.getImageData(0,0,cv.width,cv.height), p = im.data, hist = new Array(256).fill(0), i;
-    for(i=0;i<p.length;i+=4){
-      var g = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114)|0;
-      p[i]=p[i+1]=p[i+2]=g; hist[g]++;
-    }
-    var total = p.length/4, sum=0, sumB=0, wB=0, best=0, thr=128;
-    for(i=0;i<256;i++) sum += i*hist[i];
-    for(i=0;i<256;i++){
-      wB += hist[i]; if(!wB) continue;
-      var wF = total-wB; if(!wF) break;
-      sumB += i*hist[i];
-      var mB = sumB/wB, mF = (sum-sumB)/wF, between = wB*wF*(mB-mF)*(mB-mF);
-      if(between>best){ best=between; thr=i; }
-    }
-    for(i=0;i<p.length;i+=4){
-      var v = p[i] > thr ? 255 : 0;
-      p[i]=p[i+1]=p[i+2]=v;
-    }
-    cx.putImageData(im,0,0);
-  }
+  if(bw) binarize(cv);
   return cv;
+}
+/* recorte del recuadro de nombre para el escaneo en lote: mucho mas chico y rapido de leer */
+function cropNameRegion(video){
+  var vw = video.videoWidth, vh = video.videoHeight;
+  if(!vw || !vh) return null;
+  var top = Math.round(vh*0.34), bottom = Math.round(vh*0.62);
+  var left = Math.round(vw*0.06), right = Math.round(vw*0.94);
+  var w = right-left, h = bottom-top;
+  if(w<=0 || h<=0) return null;
+  var maxW = 900, sc = Math.min(1, maxW/w);
+  var cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(w*sc));
+  cv.height = Math.max(1, Math.round(h*sc));
+  var cx = cv.getContext("2d", {willReadFrequently:true});
+  cx.drawImage(video, left, top, w, h, 0, 0, cv.width, cv.height);
+  return cv;
+}
+function beep(){
+  try{
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    var ctx = new Ctx();
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "square"; o.frequency.value = 880;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    o.start();
+    o.stop(ctx.currentTime + 0.08);
+    setTimeout(function(){ ctx.close && ctx.close(); }, 200);
+  }catch(e){}
 }
 
 /* ---------- OCR ---------- */
@@ -563,6 +640,105 @@ async function runOCR(srcEl){
       "<p>No se pudo cargar el motor de lectura (necesita conexión la primera vez, y algunos navegadores lo bloquean dentro de una página embebida).</p><p>Podés cargar el pasajero a mano en la pestaña <strong>2. Escribir</strong>.</p>",
       [{t:"Ir a escribir",p:true,fn:function(){ showPane("manual"); }},{t:"Cerrar"}]);
   }
+}
+
+/* ---------- escaneo en lote (solo nombre, sin salir de la camara) ---------- */
+var batchScanning = false, batchTimer = null, batchBusy = false;
+var batchLastName = "", batchLastNameTime = 0, batchCountN = 0;
+
+function feedAdd(name, kind, id){
+  var box = $("#batchFeed");
+  var row = document.createElement("div");
+  row.className = "batchItem" + (kind==="dup" ? " dup" : "");
+  if(kind==="ok"){
+    batchCountN++;
+    $("#batchCount").textContent = "Agregados en este lote: " + batchCountN;
+    row.innerHTML = '<span>✓ '+esc(name)+'</span><button class="mini" data-undo="'+id+'">Deshacer</button>';
+    $("#batchStatusTxt").textContent = "Agregado: " + name;
+  } else {
+    row.innerHTML = '<span>= '+esc(name)+' (ya estaba en el listado)</span><span></span>';
+    $("#batchStatusTxt").textContent = "Ya estaba: " + name;
+  }
+  box.insertBefore(row, box.firstChild);
+  while(box.children.length > 10) box.removeChild(box.lastChild);
+  setTimeout(function(){ if(batchScanning) $("#batchStatusTxt").textContent = "Buscando nombre…"; }, 1800);
+}
+$("#batchFeed").addEventListener("click", function(e){
+  var b = e.target.closest("[data-undo]");
+  if(!b) return;
+  var id = b.getAttribute("data-undo");
+  state.pax = state.pax.filter(function(x){ return x.id!==id; });
+  batchCountN = Math.max(0, batchCountN-1);
+  $("#batchCount").textContent = "Agregados en este lote: " + batchCountN;
+  save(); render();
+  b.closest(".batchItem").remove();
+});
+
+function handleBatchName(name){
+  var now = Date.now();
+  /* mientras el mismo pase siga frente a la camara, no lo vuelve a agregar */
+  if(name===batchLastName && (now-batchLastNameTime) < 4000) return;
+  batchLastName = name; batchLastNameTime = now;
+  var p = {
+    name:name, eticket:"",
+    flight:($("#batchFlight").value||"").trim().toUpperCase(),
+    date:($("#batchDate").value||"").trim().toUpperCase(),
+    doc:"", seat:"", time:"", cls:"", from:"", to:"", bagPcs:"", bagKg:""
+  };
+  var k = keyOf(p);
+  var dupe = state.pax.filter(function(x){ return keyOf(x)===k; })[0];
+  if(dupe){ feedAdd(name,"dup"); return; }
+  p.id = Date.now()+"-"+Math.random().toString(36).slice(2,7);
+  p.addedAt = new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+  state.pax.push(p); save(); render();
+  feedAdd(name,"ok",p.id);
+  beep();
+}
+
+async function batchTick(){
+  if(!batchScanning || batchBusy || !stream) return;
+  var video = $("#cam");
+  if(!video || video.readyState < 2) return;
+  batchBusy = true;
+  try{
+    var cv = cropNameRegion(video);
+    if(cv){
+      binarize(cv);
+      var w = await getWorker();
+      await w.setParameters({ tessedit_pageseg_mode:"6", tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZÑ /.'-" });
+      var res = await w.recognize(cv);
+      await w.setParameters({ tessedit_pageseg_mode:"4", tessedit_char_whitelist:"" });
+      var name = extractName(res.data.text || "");
+      if(name) handleBatchName(name);
+    }
+  }catch(e){
+    /* se ignora en silencio: sigue intentando en el siguiente cuadro */
+  }
+  batchBusy = false;
+}
+
+function startBatch(){
+  if(!stream){
+    startCam().then(function(){ if(stream) startBatch(); });
+    return;
+  }
+  batchScanning = true;
+  $("#guide").style.display = "none";
+  $("#guideName").style.display = "block";
+  $("#batchPanel").style.display = "block";
+  $("#btnBatch").textContent = "Detener escaneo de nombres";
+  $("#btnShoot").disabled = true;
+  batchLastName = ""; batchLastNameTime = 0;
+  $("#batchStatusTxt").textContent = "Buscando nombre…";
+  if(batchTimer) clearInterval(batchTimer);
+  batchTimer = setInterval(batchTick, 1300);
+}
+function stopBatch(){
+  batchScanning = false;
+  if(batchTimer){ clearInterval(batchTimer); batchTimer = null; }
+  $("#guideName").style.display = "none";
+  if(stream){ $("#guide").style.display = "block"; $("#btnShoot").disabled = false; }
+  $("#btnBatch").textContent = "Escanear varios nombres (lote, sin salir)";
 }
 
 /* ---------- formularios ---------- */
@@ -707,7 +883,8 @@ async function startCam(){
     v.srcObject = stream; await v.play();
     v.style.display = "block"; $("#shot").style.display="none";
     $("#stagePh").style.display = "none"; $("#guide").style.display = "block";
-    $("#btnShoot").disabled = false; $("#btnCam").textContent = "Apagar cámara";
+    $("#btnShoot").disabled = false; $("#btnBatch").disabled = false;
+    $("#btnCam").textContent = "Apagar cámara";
   }catch(err){
     msg("La cámara no se pudo abrir",
       "<p>"+esc(err.name==="NotAllowedError" ? "No diste permiso de cámara, o la página está dentro de un marco que lo bloquea." : err.message)+"</p>"+
@@ -715,9 +892,11 @@ async function startCam(){
   }
 }
 function stopCam(){
+  stopBatch();
+  $("#batchPanel").style.display = "none";
   if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream=null; }
-  $("#cam").style.display="none"; $("#guide").style.display="none";
-  $("#btnShoot").disabled = true; $("#btnCam").textContent = "Cámara en vivo";
+  $("#cam").style.display="none"; $("#guide").style.display="none"; $("#guideName").style.display="none";
+  $("#btnShoot").disabled = true; $("#btnBatch").disabled = true; $("#btnCam").textContent = "Cámara en vivo";
   if(!$("#shot").src) $("#stagePh").style.display = "block";
 }
 
@@ -753,6 +932,14 @@ $("#btnShoot").onclick = function(){
   img.style.display="block";
   stopCam();
   img.onload = function(){ runOCR(img); };
+};
+
+$("#btnBatch").onclick = function(){
+  if(batchScanning) stopBatch(); else startBatch();
+};
+$("#btnBatchDone").onclick = function(){
+  stopBatch(); stopCam();
+  showPane("list");
 };
 
 $("#btnConfirmAdd").onclick = function(){
