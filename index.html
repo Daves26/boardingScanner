@@ -62,9 +62,9 @@ video{width:100%;height:100%;object-fit:cover}
 #roi{
   position:absolute;
   left:8%;
-  top:38%;
+  top:34%;
   width:84%;
-  height:22%;
+  height:32%;
   border:3px dashed #fff;
   background:rgba(255,255,255,.07);
 }
@@ -503,13 +503,13 @@ function warpDocument(src,pts){
  * NOMBRE DEL PASAJERO / PASSENGER NAME
  *
  * Basado en el formato mostrado por el usuario:
- * x ≈ 8%-92%, y ≈ 38%-63% del documento.
+ * x ≈ 8%-92%, y ≈ 34%-66% del documento.
  */
 function extractNameBand(warp){
   const x=Math.round(warp.cols*0.08);
-  const y=Math.round(warp.rows*0.38);
+  const y=Math.round(warp.rows*0.34);
   const w=Math.round(warp.cols*0.84);
-  const h=Math.round(warp.rows*0.25);
+  const h=Math.round(warp.rows*0.32);
   return warp.roi(new cv.Rect(x,y,w,h));
 }
 
@@ -521,15 +521,25 @@ function preprocessForOCR(mat){
   cv.cvtColor(mat,gray,cv.COLOR_RGBA2GRAY);
   cv.resize(gray,enlarged,new cv.Size(0,0),2.2,2.2,cv.INTER_CUBIC);
 
-  // Normalización de contraste + binarización.
+  // Normalización de contraste local + binarización adaptativa.
   cv.GaussianBlur(enlarged,enlarged,new cv.Size(3,3),0);
-  cv.threshold(enlarged,bw,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
 
-  // Limpieza ligera para caracteres pequeños.
+  // CLAHE para mejorar contraste local en letras pequeñas/con sombras.
+  const clahe = cv.createCLAHE(3.0, new cv.Size(8,8));
+  clahe.apply(enlarged, enlarged);
+  clahe.delete();
+
+  // Umbralización adaptativa gaussiana en vez de Otsu global:
+  // maneja mejor contraste desigual (papel brillante, flash, sombras).
+  cv.adaptiveThreshold(enlarged,bw,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+    cv.THRESH_BINARY,31,10);
+
+  // Cerrar trazos rotos (MORPH_CLOSE) en vez de abrir (MORPH_OPEN)
+  // que borra letras pequeñas.
   const kernel=cv.getStructuringElement(
-    cv.MORPH_RECT,new cv.Size(2,2)
+    cv.MORPH_RECT,new cv.Size(3,3)
   );
-  cv.morphologyEx(bw,bw,cv.MORPH_OPEN,kernel);
+  cv.morphologyEx(bw,bw,cv.MORPH_CLOSE,kernel);
   kernel.delete();
 
   return {gray,enlarged,bw};
@@ -573,7 +583,7 @@ function extractName(text){
    * Separamos el "+" opcional del nombre para validarlo correctamente.
    */
   const match=text.match(
-    /\b([A-Z]{2,25})\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3})(\+)?(?:\b|$)/
+    /\b([A-Z]+(?: [A-Z]+)*)\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3})(\+)?(?:\b|$)/
   );
 
   if(!match) return null;
@@ -710,15 +720,15 @@ async function processFrame(){
 
     // ROI de cámara: corresponde al recuadro mostrado en pantalla.
     const x=Math.round(vw*0.08);
-    const y=Math.round(vh*0.38);
+    const y=Math.round(vh*0.34);
     const w=Math.round(vw*0.84);
-    const h=Math.round(vh*0.22);
+    const h=Math.round(vh*0.32);
 
     // Mostrar visualmente la ROI activa.
     roiBox.style.left="8%";
-    roiBox.style.top="38%";
+    roiBox.style.top="34%";
     roiBox.style.width="84%";
-    roiBox.style.height="22%";
+    roiBox.style.height="32%";
 
     // Ya no necesitamos que documentBox controle el flujo.
     documentBox.style.display="none";
