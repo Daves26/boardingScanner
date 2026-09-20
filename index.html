@@ -1,88 +1,93 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RUTAS Y RUMBOS • LISTADO DE ABORDAJE</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Rutas y Rumbos - Listado de Abordaje</title>
+
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-*{box-sizing:border-box}
+*{margin:0;padding:0;box-sizing:border-box}
 body{
-margin:0;
-background:#c0c0c0;
-font-family:Tahoma,Verdana,Arial,sans-serif;
+background:#bfbfbf;
+font-family:Tahoma,Verdana,sans-serif;
 color:#000;
+padding:8px;
 }
-
 .window{
 max-width:900px;
-margin:14px auto;
+margin:auto;
+background:#d4d4d4;
 border:3px solid #000;
-background:#efefef;
 box-shadow:8px 8px 0 #000;
 }
-
 .titlebar{
 background:#000;
 color:#fff;
-padding:8px 10px;
+padding:8px;
 font-weight:bold;
-letter-spacing:1px;
 font-size:18px;
+letter-spacing:1px;
 }
-
-.panel{
+.section{
+padding:8px;
 border-top:3px solid #000;
-padding:10px;
 }
-
 .camera{
 position:relative;
+background:#111;
 border:3px solid #000;
-background:#222;
 aspect-ratio:3/4;
 overflow:hidden;
 }
-
 video{
 width:100%;
 height:100%;
 object-fit:cover;
 }
-
-.overlay{
+#overlay{
 position:absolute;
 inset:0;
 pointer-events:none;
 }
-
-.scanbox{
+#roi{
 position:absolute;
-left:10%;
-top:22%;
-width:80%;
-height:56%;
+left:11%;
+top:30%;
+width:78%;
+height:12%;
 border:3px dashed #fff;
+background:rgba(255,255,255,.05);
 }
-
+#roiLabel{
+position:absolute;
+top:-22px;
+left:0;
+background:#fff;
+color:#000;
+padding:2px 6px;
+font-size:11px;
+font-weight:bold;
+border:2px solid #000;
+}
 .cross{
 position:absolute;
 left:50%;
 top:50%;
-width:90%;
-height:2px;
+width:100%;
+height:1px;
 background:#fff;
+opacity:.3;
 transform:translate(-50%,-50%);
-opacity:.5;
 }
-
 .grid{
 display:grid;
 grid-template-columns:repeat(2,1fr);
 gap:8px;
-margin-top:10px;
+margin-top:8px;
 }
-
 .btn{
 background:#fff;
 border:3px solid #000;
@@ -92,69 +97,71 @@ cursor:pointer;
 box-shadow:4px 4px 0 #000;
 text-transform:uppercase;
 }
-
 .btn:active{
 transform:translate(4px,4px);
 box-shadow:none;
 }
-
-.info{
+.stats{
 display:grid;
 grid-template-columns:repeat(3,1fr);
 gap:8px;
-margin-top:10px;
+margin-top:8px;
 }
-
 .box{
 background:#fff;
 border:3px solid #000;
-padding:10px;
+padding:8px;
 box-shadow:4px 4px 0 #000;
+text-align:center;
 }
-
+.box h3{
+font-size:12px;
+margin-bottom:4px;
+}
 .big{
 font-size:28px;
 font-weight:bold;
-text-align:center;
 }
-
+#last{
+font-size:13px;
+font-weight:bold;
+word-break:break-word;
+}
+.status{
+margin-top:8px;
+background:#fff;
+border:3px solid #000;
+padding:8px;
+font-weight:bold;
+min-height:42px;
+}
 table{
 width:100%;
 border-collapse:collapse;
 background:#fff;
 }
-
 th,td{
 border:2px solid #000;
-padding:8px;
+padding:6px;
 font-size:14px;
 }
-
 th{
-background:#d9d9d9;
+background:#cfcfcf;
 }
-
-.status{
-margin-top:8px;
-padding:8px;
-border:2px solid #000;
-background:#fff;
-font-weight:bold;
-}
-
 .footer{
 padding:8px;
 text-align:center;
-font-size:12px;
-border-top:3px solid #000;
+font-size:11px;
 background:#dcdcdc;
+border-top:3px solid #000;
 }
-
-@media(max-width:700px){
-.grid,.info{grid-template-columns:1fr}
+#hiddenCanvas{display:none}
+@media(max-width:600px){
+.grid,.stats{grid-template-columns:1fr}
 }
 </style>
 </head>
+
 <body>
 
 <div class="window">
@@ -163,54 +170,56 @@ background:#dcdcdc;
 ▣ RUTAS Y RUMBOS :: LISTADO DE ABORDAJE SATENA
 </div>
 
-<div class="panel">
+<div class="section">
 
 <div class="camera">
 <video id="video" autoplay playsinline muted></video>
 
-<div class="overlay">
-<div class="scanbox"></div>
+<div id="overlay">
+<div id="roi">
+<div id="roiLabel">NOMBRE DEL PASAJERO</div>
+</div>
 <div class="cross"></div>
 </div>
 </div>
 
 <div class="grid">
-<button class="btn" id="start">INICIAR CÁMARA</button>
-<button class="btn" id="stop">DETENER</button>
-<button class="btn" id="clear">LIMPIAR LISTADO</button>
-<button class="btn" id="csv">EXPORTAR CSV</button>
+<button class="btn" id="start">Iniciar cámara</button>
+<button class="btn" id="stop">Detener</button>
+<button class="btn" id="clear">Limpiar</button>
+<button class="btn" id="csv">Exportar CSV</button>
 </div>
 
-<div class="info">
+<div class="stats">
 <div class="box">
-<div>TOTAL</div>
+<h3>TOTAL</h3>
 <div class="big" id="count">0</div>
 </div>
 
 <div class="box">
-<div>ÚLTIMO</div>
-<div id="last" style="font-weight:bold">---</div>
+<h3>ÚLTIMO</h3>
+<div id="last">---</div>
 </div>
 
 <div class="box">
-<div>ESTADO</div>
-<div id="engine">PDF417</div>
+<h3>OCR</h3>
+<div id="ocrState">CARGANDO</div>
 </div>
 </div>
 
 <div class="status" id="status">
-Esperando cámara...
+Inicializando OCR...
 </div>
 
 </div>
 
-<div class="panel">
+<div class="section">
 
 <table>
 <thead>
 <tr>
-<th width="60">#</th>
-<th>NOMBRE DEL PASAJERO</th>
+<th width="50">#</th>
+<th>Pasajero</th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
@@ -219,46 +228,74 @@ Esperando cámara...
 </div>
 
 <div class="footer">
-RETRO WINDOWS 95 • PDF417 • ESCANEO CONTINUO
+RETRO WINDOWS 95 · OCR AUTOMÁTICO · SATENA LPZ → EOH
 </div>
 
 </div>
+
+<canvas id="hiddenCanvas"></canvas>
 
 <script>
-const video=document.getElementById('video');
-const tbody=document.getElementById('tbody');
-const count=document.getElementById('count');
-const last=document.getElementById('last');
-const statusEl=document.getElementById('status');
-const engine=document.getElementById('engine');
+const video=document.getElementById("video");
+const canvas=document.getElementById("hiddenCanvas");
+const ctx=canvas.getContext("2d",{willReadFrequently:true});
 
-let detector=null;
-let stream=null;
-let scanning=false;
+const tbody=document.getElementById("tbody");
+const count=document.getElementById("count");
+const last=document.getElementById("last");
+const statusBox=document.getElementById("status");
+const ocrState=document.getElementById("ocrState");
+
+let worker;
+let stream;
+let running=false;
+let busy=false;
 
 const pasajeros=new Map();
 
-async function iniciar(){
+const BLACKLIST=[
+"SAN","GIL","MEDELLIN","MEDELLÍN",
+"FROM","TO","DATE","TIME","BOARDING",
+"GATE","CONTROL","FLIGHT","EQUIPAJE",
+"PASSENGER","NAME","NOMBRE","PASAJERO"
+];
 
-if(!('BarcodeDetector' in window)){
-statusEl.textContent='Este navegador no soporta BarcodeDetector.';
-return;
+function beep(){
+const a=new(window.AudioContext||window.webkitAudioContext)();
+const o=a.createOscillator();
+const g=a.createGain();
+o.type="square";
+o.frequency.value=950;
+o.connect(g);
+g.connect(a.destination);
+g.gain.value=.05;
+o.start();
+o.stop(a.currentTime+.09);
 }
 
-const formatos=await BarcodeDetector.getSupportedFormats();
-
-if(!formatos.includes('pdf417')){
-statusEl.textContent='El dispositivo no soporta PDF417.';
-return;
+function vibrar(){
+if(navigator.vibrate)navigator.vibrate(80);
 }
 
-engine.textContent='PDF417 NATIVO';
+async function initOCR(){
 
-detector=new BarcodeDetector({formats:['pdf417']});
+worker=await Tesseract.createWorker("eng");
+
+await worker.setParameters({
+tessedit_pageseg_mode:Tesseract.PSM.SINGLE_LINE,
+preserve_interword_spaces:"1",
+tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ/+ "
+});
+
+ocrState.innerText="LISTO";
+statusBox.innerText="OCR preparado.";
+}
+
+async function startCamera(){
 
 stream=await navigator.mediaDevices.getUserMedia({
 video:{
-facingMode:{ideal:'environment'},
+facingMode:{ideal:"environment"},
 width:{ideal:1920},
 height:{ideal:1080}
 },
@@ -268,135 +305,186 @@ audio:false
 video.srcObject=stream;
 await video.play();
 
-scanning=true;
-statusEl.textContent='Escaneando... acerque el pase de abordar.';
-requestAnimationFrame(loop);
+running=true;
+loop();
+statusBox.innerText="Escaneando...";
 }
 
-function detener(){
-scanning=false;
+function stopCamera(){
+running=false;
 if(stream){
 stream.getTracks().forEach(t=>t.stop());
 stream=null;
 }
-statusEl.textContent='Cámara detenida.';
+statusBox.innerText="Cámara detenida.";
 }
 
-async function loop(){
-
-if(!scanning) return;
-
-try{
-
-const codes=await detector.detect(video);
-
-for(const code of codes){
-
-const raw=code.rawValue||'';
-
-const nombre=extraerNombre(raw);
-
-if(nombre){
-
-if(!pasajeros.has(nombre)){
-
-pasajeros.set(nombre,true);
-agregar(nombre);
-
-statusEl.textContent='✔ Agregado: '+nombre;
-
-await vibrar();
-
-}else{
-
-statusEl.textContent='Duplicado ignorado: '+nombre;
-
+function normalize(text){
+return text
+.replace(/\n/g," ")
+.replace(/\s+/g," ")
+.replace(/[^A-Z/+ ]/g,"")
+.trim();
 }
 
-await pausa(900);
-break;
+function extractName(text){
 
+text=normalize(text);
+
+const match=text.match(/([A-Z]{2,}(?: [A-Z]{2,})*)\/([A-Z+ ]{2,})/);
+
+if(!match)return null;
+
+const surname=match[1].trim();
+const given=match[2].trim();
+
+const combined=surname+"/"+given;
+
+for(const w of BLACKLIST){
+if(combined.includes(w))return null;
 }
 
+if(surname.length<2||given.length<2)return null;
+
+return combined;
 }
 
-}catch(e){}
-
-requestAnimationFrame(loop);
+function pretty(name){
+return name.split("/").map(part=>
+part.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())
+).join("/");
 }
 
-function extraerNombre(txt){
+function addPassenger(raw){
 
-let limpio=txt.replace(/\r/g,' ').replace(/\n/g,' ');
+const key=raw.replace(/\s+/g," ").trim();
 
-// Busca APELLIDO/NOMBRE en el contenido del PDF417
-const m=limpio.match(/([A-Z]{2,}\/[A-Z]{2,}(?:\s[A-Z]{2,})*)/);
-
-if(m) return capitalizar(m[1]);
-
-return null;
+if(pasajeros.has(key)){
+statusBox.innerText="Duplicado: "+pretty(key);
+return;
 }
 
-function capitalizar(t){
-return t.split('/').map(p=>
-p.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())
-).join('/');
-}
+pasajeros.set(key,true);
 
-function agregar(nombre){
-
-const tr=document.createElement('tr');
+const tr=document.createElement("tr");
 
 tr.innerHTML=
 `<td>${pasajeros.size}</td>
-<td>${nombre}</td>`;
+<td>${pretty(key)}</td>`;
 
 tbody.appendChild(tr);
 
-count.textContent=pasajeros.size;
-last.textContent=nombre;
+count.innerText=pasajeros.size;
+last.innerText=pretty(key);
+
+statusBox.innerText="✔ "+pretty(key);
+
+beep();
+vibrar();
 }
 
-function pausa(ms){
-return new Promise(r=>setTimeout(r,ms));
+async function processFrame(){
+
+if(busy||!running)return;
+
+busy=true;
+
+const vw=video.videoWidth;
+const vh=video.videoHeight;
+
+const x=vw*.11;
+const y=vh*.30;
+const w=vw*.78;
+const h=vh*.12;
+
+canvas.width=w*1.8;
+canvas.height=h*1.8;
+
+ctx.drawImage(video,x,y,w,h,0,0,canvas.width,canvas.height);
+
+let img=ctx.getImageData(0,0,canvas.width,canvas.height);
+let d=img.data;
+
+for(let i=0;i<d.length;i+=4){
+
+let g=(d[i]+d[i+1]+d[i+2])/3;
+g=g>150?255:0;
+
+d[i]=g;
+d[i+1]=g;
+d[i+2]=g;
 }
 
-async function vibrar(){
-if(navigator.vibrate) navigator.vibrate(120);
+ctx.putImageData(img,0,0);
+
+const {data:{text}}=await worker.recognize(canvas);
+
+const name=extractName(text);
+
+if(name){
+addPassenger(name);
+await new Promise(r=>setTimeout(r,700));
 }
 
-document.getElementById('start').onclick=iniciar;
-document.getElementById('stop').onclick=detener;
+busy=false;
+}
 
-document.getElementById('clear').onclick=()=>{
-pasajeros.clear();
-tbody.innerHTML='';
-count.textContent='0';
-last.textContent='---';
-statusEl.textContent='Listado vacío.';
+function loop(){
+
+if(!running)return;
+
+processFrame().finally(()=>{
+setTimeout(()=>requestAnimationFrame(loop),120);
+});
+}
+
+document.getElementById("start").onclick=async()=>{
+
+if(running)return;
+
+try{
+await startCamera();
+}catch(e){
+statusBox.innerText="No fue posible abrir la cámara.";
+}
+
 };
 
-document.getElementById('csv').onclick=()=>{
+document.getElementById("stop").onclick=stopCamera;
 
-let csv='N°,NOMBRE\\n';
+document.getElementById("clear").onclick=()=>{
 
+pasajeros.clear();
+tbody.innerHTML="";
+count.innerText="0";
+last.innerText="---";
+statusBox.innerText="Listado vacío.";
+
+};
+
+document.getElementById("csv").onclick=()=>{
+
+let csv="N,Pasajero\n";
 let i=1;
 
 for(const n of pasajeros.keys()){
-csv+=`${i},"${n}"\\n`;
+csv+=`${i},"${pretty(n)}"\n`;
 i++;
 }
 
-const blob=new Blob([csv],{type:'text/csv'});
+const blob=new Blob([csv],{type:"text/csv"});
 const url=URL.createObjectURL(blob);
 
-const a=document.createElement('a');
+const a=document.createElement("a");
 a.href=url;
-a.download='listado_abordaje.csv';
+a.download="listado_abordaje_satena.csv";
 a.click();
 
 URL.revokeObjectURL(url);
+
 };
+
+initOCR();
 </script>
 
 </body>
