@@ -521,13 +521,11 @@ function preprocessForOCR(mat){
   cv.cvtColor(mat,gray,cv.COLOR_RGBA2GRAY);
   cv.resize(gray,enlarged,new cv.Size(0,0),2.2,2.2,cv.INTER_CUBIC);
 
-  // Normalización de contraste local + binarización adaptativa.
+  // Normalización de contraste + binarización adaptativa.
   cv.GaussianBlur(enlarged,enlarged,new cv.Size(3,3),0);
 
-  // CLAHE para mejorar contraste local en letras pequeñas/con sombras.
-  const clahe = cv.createCLAHE(3.0, new cv.Size(8,8));
-  clahe.apply(enlarged, enlarged);
-  clahe.delete();
+  // Equalización de histograma global (cv.createCLAHE no existe en OpenCV.js).
+  cv.equalizeHist(enlarged, enlarged);
 
   // Umbralización adaptativa gaussiana en vez de Otsu global:
   // maneja mejor contraste desigual (papel brillante, flash, sombras).
