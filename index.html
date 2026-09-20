@@ -1,1651 +1,816 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>Manifiesto de Abordaje</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ABORDAJE.EXE</title>
 <style>
-  :root{
-    --bg:#F3F5F7; --panel:#FFFFFF; --panel-2:#F7F9FA; --border:#DCE2E8;
-    --text:#12181F; --text-muted:#5B6673;
-    --accent:#B9720E; --accent-contrast:#FFFFFF;
-    --success:#1D8A54; --success-bg:#E4F6EC;
-    --danger:#C6323A; --danger-bg:#FBE7E8;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+:root{
+  --paper:#ffffff;
+  --panel:#d4d4d4;
+  --panel-2:#bdbdbd;
+  --panel-3:#9e9e9e;
+  --desk:#7a7a7a;
+  --ink:#000000;
+  --ink-soft:#4a4a4a;
+  --shadow:#000000;
+  --bar:#000000;
+  --bar-ink:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111111;
+    --panel:#2c2c2c;
+    --panel-2:#3d3d3d;
+    --panel-3:#585858;
+    --desk:#1a1a1a;
+    --ink:#ffffff;
+    --ink-soft:#c2c2c2;
+    --shadow:#000000;
+    --bar:#ffffff;
+    --bar-ink:#000000;
   }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#0B1220; --panel:#131B2E; --panel-2:#171F35; --border:#263254;
-      --text:#F2F5F8; --text-muted:#93A0B4;
-      --accent:#F2A93C; --accent-contrast:#1A1305;
-      --success:#34C77B; --success-bg:rgba(52,199,123,.14);
-      --danger:#FF6B6F; --danger-bg:rgba(255,107,111,.14);
-    }
-  }
-  :root[data-theme="dark"]{
-    --bg:#0B1220; --panel:#131B2E; --panel-2:#171F35; --border:#263254;
-    --text:#F2F5F8; --text-muted:#93A0B4;
-    --accent:#F2A93C; --accent-contrast:#1A1305;
-    --success:#34C77B; --success-bg:rgba(52,199,123,.14);
-    --danger:#FF6B6F; --danger-bg:rgba(255,107,111,.14);
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  [hidden]{display:none !important;}
-  body{
-    background:var(--bg); color:var(--text); font-family:var(--sans);
-    min-height:100vh; -webkit-tap-highlight-color:transparent;
-  }
-  #app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
-
-  /* ---------- Barra superior ---------- */
-  header.topbar{
-    position:sticky; top:0; z-index:5;
-    background:var(--bg); border-bottom:1px solid var(--border);
-    padding:14px 16px 12px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
-  }
-  .flight-field{flex:1; min-width:0;}
-  .flight-field label{display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;}
-  #flightLabel{
-    width:100%; border:1px solid var(--border); background:var(--panel); color:var(--text);
-    border-radius:8px; padding:8px 10px; font-size:14px; font-family:var(--sans);
-  }
-  #flightLabel:focus{outline:2px solid var(--accent); outline-offset:1px;}
-  .counter{text-align:right; flex-shrink:0;}
-  .counter .num{font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;}
-  .counter .lbl{display:block; font-size:11px; color:var(--text-muted); margin-top:2px;}
-
-  main{flex:1; padding:16px; display:flex; flex-direction:column; gap:14px; overflow-x:hidden;}
-
-  /* ---------- Botón de escaneo ---------- */
-  .scan-btn{
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    width:100%; padding:16px; border:none; border-radius:12px;
-    background:var(--accent); color:var(--accent-contrast);
-    font-size:17px; font-weight:600; font-family:var(--sans); cursor:pointer;
-  }
-  .scan-btn:active{opacity:.85;}
-  .scan-btn svg{width:22px;height:22px;flex-shrink:0;}
-
-  /* ---------- Barra de herramientas ---------- */
-  .toolbar{display:flex; gap:8px; flex-wrap:wrap;}
-  #searchInput{
-    flex:1; min-width:120px; border:1px solid var(--border); background:var(--panel); color:var(--text);
-    border-radius:8px; padding:9px 10px; font-size:14px; font-family:var(--sans);
-  }
-  .btn-ghost{
-    border:1px solid var(--border); background:var(--panel); color:var(--text);
-    border-radius:8px; padding:9px 12px; font-size:13px; font-family:var(--sans); cursor:pointer; white-space:nowrap;
-  }
-  .btn-ghost.danger{color:var(--danger); border-color:var(--danger);}
-
-  /* ---------- Lista / manifiesto ---------- */
-  .empty{color:var(--text-muted); font-size:14px; text-align:center; padding:30px 10px; line-height:1.5;}
-  ol.manifest{list-style:none; margin:0; padding:0; border-top:1px solid var(--border);}
-  .row{
-    display:flex; gap:10px; align-items:flex-start; padding:12px 2px;
-    border-bottom:1px solid var(--border);
-  }
-  .row .seq{
-    font-family:var(--mono); font-size:12px; color:var(--text-muted); width:22px; flex-shrink:0; padding-top:3px; text-align:right;
-  }
-  .row .info{flex:1; min-width:0;}
-  .row .name{font-size:15px; font-weight:600; overflow-wrap:anywhere;}
-  .row .meta{font-size:12.5px; color:var(--text-muted); margin-top:3px; display:flex; flex-wrap:wrap; gap:6px 10px; font-family:var(--mono);}
-  .row .del{
-    border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;
-  }
-  .row .del:active{color:var(--danger);}
-  .row.dim{display:none;}
-
-  /* ---------- Overlay de escaneo ---------- */
-  .scan-overlay{
-    position:fixed; inset:0; background:#000; z-index:50;
-    display:flex; flex-direction:column;
-  }
-  /* IMPORTANTE: 'contain', no 'cover'.
-     Con la pantalla en vertical y un stream 16:9, 'cover' recorta y tira
-     alrededor del 70% del ancho del sensor — justo los píxeles que hacen
-     falta para resolver las barras finas. Con 'contain' se ve el cuadro
-     completo (con franjas negras arriba y abajo) y el recuadro del visor
-     puede abarcar casi todo el ancho real de la imagen. */
-  .scan-overlay video{
-    position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000;
-  }
-  /* El visor imita la forma real del PDF417 del pase (muy apaisado).
-     Cuanto más ajustado, más cerca acerca el usuario el papel y más
-     píxeles por módulo recibe el decodificador. */
-  .viewfinder{
-    position:relative; margin:auto; width:94%; max-width:640px; aspect-ratio:6/1;
-    z-index:2; pointer-events:none;
-  }
-  .zoom-quick{
-    position:relative; z-index:3; display:flex; justify-content:center; gap:8px;
-    padding:0 16px 4px;
-  }
-  .zoom-quick button{
-    border:1px solid rgba(255,255,255,.35); background:rgba(20,20,20,.55); color:#fff;
-    border-radius:999px; padding:6px 14px; font-size:13px; cursor:pointer;
-  }
-  .zoom-quick button.on{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
-  .viewfinder .corner{position:absolute; width:26px; height:26px; border:3px solid var(--accent);}
-  .viewfinder .corner.tl{top:0;left:0;border-right:none;border-bottom:none;}
-  .viewfinder .corner.tr{top:0;right:0;border-left:none;border-bottom:none;}
-  .viewfinder .corner.bl{bottom:0;left:0;border-right:none;border-top:none;}
-  .viewfinder .corner.br{bottom:0;right:0;border-left:none;border-top:none;}
-  .scan-status{
-    position:relative; z-index:2; text-align:center; color:#fff; font-size:14px;
-    margin:14px 20px 0; text-shadow:0 1px 3px rgba(0,0,0,.6);
-  }
-  .scan-controls{
-    position:relative; z-index:2; display:flex; justify-content:center; gap:14px;
-    padding:22px 16px calc(22px + env(safe-area-inset-bottom));
-  }
-  .round-btn{
-    width:52px;height:52px;border-radius:50%; border:1px solid rgba(255,255,255,.35);
-    background:rgba(20,20,20,.55); color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-  }
-  .round-btn.close{background:rgba(198,50,58,.75);}
-  .round-btn.on{background:var(--accent); color:var(--accent-contrast); border-color:var(--accent);}
-
-  .scan-diag{
-    position:relative; z-index:2; text-align:center; color:rgba(255,255,255,.72);
-    font-size:11px; margin:6px 20px 0; text-shadow:0 1px 3px rgba(0,0,0,.6);
-    font-variant-numeric:tabular-nums;
-  }
-  .zoom-row{
-    position:relative; z-index:2; display:flex; align-items:center; gap:10px;
-    padding:10px 26px 0; color:#fff; font-size:15px;
-  }
-  .zoom-row input{flex:1; accent-color:var(--accent);}
-
-  .feedback{
-    position:absolute; left:16px; right:16px; bottom:110px; z-index:3;
-    border-radius:12px; padding:14px 16px; text-align:left;
-    font-size:14px; line-height:1.4;
-  }
-  .feedback.ok{background:var(--success-bg); color:var(--success); border:1px solid var(--success);}
-  .feedback.dup{background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger);}
-  .feedback b{display:block; font-size:16px; margin-bottom:2px;}
-
-  /* ---------- Modal manual ---------- */
-  .modal{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:60; display:flex; align-items:flex-end;}
-  .modal-card{
-    background:var(--panel); width:100%; border-radius:16px 16px 0 0; padding:20px;
-    padding-bottom:calc(20px + env(safe-area-inset-bottom));
-  }
-  .modal-card h2{margin:0 0 6px; font-size:17px;}
-  .modal-card p{margin:0 0 12px; font-size:13px; color:var(--text-muted); line-height:1.4;}
-  #manualInput{
-    width:100%; border:1px solid var(--border); background:var(--panel-2); color:var(--text);
-    border-radius:8px; padding:10px; font-family:var(--mono); font-size:12.5px; resize:vertical;
-  }
-  .modal-actions{display:flex; gap:10px; margin-top:14px;}
-  .modal-actions button{flex:1; padding:11px; border-radius:8px; font-size:14px; font-family:var(--sans); cursor:pointer;}
-  .modal-actions .primary{border:none; background:var(--accent); color:var(--accent-contrast); font-weight:600;}
-  .modal-actions .secondary{border:1px solid var(--border); background:transparent; color:var(--text);}
-
-  /* ---------- Toast ---------- */
-  .modal-card.wide{max-width:520px;}
-  .ocr-grid{
-    display:grid; grid-template-columns:1fr 1fr; gap:8px;
-    max-height:50vh; overflow-y:auto; margin:4px 0 14px;
-  }
-  .ocr-field{display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--text-muted);}
-  .ocr-field input{
-    width:100%; padding:8px; border:1px solid var(--border); border-radius:8px;
-    background:var(--panel-2); color:var(--text); font-family:var(--mono); font-size:13px;
-  }
-  .ocr-field.warn span{color:var(--accent); font-weight:600;}
-  .ocr-field.warn input{border-color:var(--accent); background:rgba(185,114,14,.10);}
-  .toast{
-    position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:70;
-    max-width:448px; margin:0 auto; background:var(--panel); border:1px solid var(--border); color:var(--text);
-    padding:12px 14px; border-radius:10px; font-size:13.5px; box-shadow:0 6px 20px rgba(0,0,0,.18);
-  }
+}
+:root[data-theme="dark"]{
+  --paper:#111111;--panel:#2c2c2c;--panel-2:#3d3d3d;--panel-3:#585858;--desk:#1a1a1a;
+  --ink:#ffffff;--ink-soft:#c2c2c2;--shadow:#000000;--bar:#ffffff;--bar-ink:#000000;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{ scroll-padding-top: env(safe-area-inset-top,0px); -webkit-text-size-adjust:100%; }
+body{
+  margin:0;
+  background:var(--desk);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px);
+  color:var(--ink);
+  font-family:Tahoma,"MS Sans Serif",Geneva,Verdana,sans-serif;
+  font-size:13px;
+  line-height:1.45;
+  padding:10px;
+  min-height:100vh;
+}
+.win{
+  max-width:840px;margin:0 auto;background:var(--panel);
+  border:3px solid var(--ink);box-shadow:8px 8px 0 var(--shadow);
+}
+.titlebar{
+  background:var(--bar);color:var(--bar-ink);
+  display:flex;align-items:center;gap:8px;
+  padding:5px 6px;border-bottom:3px solid var(--ink);
+  font-weight:700;letter-spacing:.04em;
+}
+.titlebar .grip{flex:0 0 auto;width:16px;height:14px;
+  background:repeating-linear-gradient(0deg,var(--bar-ink) 0 2px,transparent 2px 4px);}
+.titlebar h1{font-size:13px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbtn{
+  width:20px;height:18px;flex:0 0 auto;background:var(--panel);color:var(--ink);
+  border:2px solid var(--ink);font:700 11px/1 Tahoma,sans-serif;cursor:default;
+  display:grid;place-items:center;padding:0;
+}
+.menubar{display:flex;flex-wrap:wrap;gap:0;border-bottom:3px solid var(--ink);background:var(--panel)}
+.menubar button{
+  background:transparent;border:0;border-right:2px solid var(--ink);
+  padding:6px 12px;font:13px Tahoma,sans-serif;color:var(--ink);cursor:pointer;
+}
+.menubar button:hover,.menubar button:focus-visible{background:var(--bar);color:var(--bar-ink);outline:none}
+.tabs{display:flex;gap:6px;padding:10px 10px 0;background:var(--panel)}
+.tab{
+  flex:1;padding:10px 4px;background:var(--panel-2);color:var(--ink);
+  border:3px solid var(--ink);border-bottom-width:3px;
+  font:700 13px Tahoma,sans-serif;cursor:pointer;
+  box-shadow:4px 4px 0 var(--shadow);
+}
+.tab[aria-selected="true"]{background:var(--bar);color:var(--bar-ink);box-shadow:none;transform:translate(4px,4px)}
+.pane{padding:14px;background:var(--panel);display:none}
+.pane.on{display:block}
+.card{
+  background:var(--paper);border:3px solid var(--ink);
+  box-shadow:6px 6px 0 var(--shadow);padding:12px;margin-bottom:16px;
+}
+.card h2{font-size:13px;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid var(--ink);letter-spacing:.06em}
+p{margin:0 0 10px}
+.muted{color:var(--ink-soft);font-size:12px}
+.btn{
+  display:inline-block;background:var(--panel-2);color:var(--ink);
+  border:3px solid var(--ink);box-shadow:4px 4px 0 var(--shadow);
+  font:700 13px Tahoma,sans-serif;padding:10px 14px;cursor:pointer;border-radius:0;
+  -webkit-appearance:none;appearance:none;
+}
+.btn:hover{background:var(--panel-3)}
+.btn:active{transform:translate(4px,4px);box-shadow:none}
+.btn:focus-visible{outline:3px dashed var(--ink);outline-offset:3px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--bar);color:var(--bar-ink)}
+.btn.wide{display:block;width:100%;margin-bottom:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 150px}
+label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;margin-bottom:3px}
+input[type=text],input[type=search],select{
+  width:100%;background:var(--paper);color:var(--ink);
+  border:3px solid var(--ink);padding:8px;font:13px Tahoma,sans-serif;border-radius:0;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus{outline:3px solid var(--ink);outline-offset:-3px}
+.field{margin-bottom:10px;position:relative}
+.field.auto::after{content:"OCR";position:absolute;right:6px;top:0;font-size:10px;font-weight:700;
+  background:var(--bar);color:var(--bar-ink);padding:1px 4px}
+.field.miss::after{content:"VACÍO";position:absolute;right:6px;top:0;font-size:10px;font-weight:700;
+  border:2px solid var(--ink);padding:0 3px}
+#stage{
+  border:3px solid var(--ink);background:var(--paper);position:relative;
+  aspect-ratio:3/4;max-height:52vh;display:grid;place-items:center;overflow:hidden;margin-bottom:12px;
+}
+#stage video,#stage img{width:100%;height:100%;object-fit:contain;display:block}
+#stage .ph{padding:18px;text-align:center;font-size:12px;color:var(--ink-soft)}
+.guide{position:absolute;inset:10% 12%;border:3px dashed var(--ink);pointer-events:none;opacity:.55}
+.bar{border:3px solid var(--ink);height:22px;background:var(--paper);margin:10px 0;position:relative}
+.bar>i{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,var(--ink) 0 8px,transparent 8px 12px)}
+.bar>span{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:700}
+.tablewrap{overflow-x:auto;border:3px solid var(--ink);background:var(--paper)}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:12px}
+th,td{border:2px solid var(--ink);padding:6px 7px;text-align:left;vertical-align:top}
+th{background:var(--bar);color:var(--bar-ink);font-size:11px;letter-spacing:.06em;position:sticky;top:0}
+tbody tr:nth-child(even) td{background:var(--panel-2)}
+td.num{font-variant-numeric:tabular-nums}
+.mini{border:2px solid var(--ink);background:var(--panel-2);color:var(--ink);font:700 11px Tahoma,sans-serif;padding:3px 6px;cursor:pointer}
+.mini:active{transform:translate(2px,2px)}
+.empty{padding:26px 14px;text-align:center;border:3px dashed var(--ink);background:var(--paper)}
+.statusbar{
+  display:flex;flex-wrap:wrap;gap:0;border-top:3px solid var(--ink);background:var(--panel);
+}
+.statusbar div{flex:1 1 33%;padding:6px 8px;border-right:2px solid var(--ink);font-size:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.statusbar div:last-child{border-right:0}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;padding:14px;z-index:50}
+.overlay.on{display:grid}
+.dlg{width:100%;max-width:460px;max-height:88vh;overflow:auto;background:var(--panel);
+  border:3px solid var(--ink);box-shadow:8px 8px 0 var(--shadow)}
+.dlg .titlebar{font-size:12px}
+.dlg .body{padding:12px}
+.dlg .foot{padding:10px 12px;border-top:3px solid var(--ink);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+details{border:2px solid var(--ink);background:var(--paper);margin-top:10px}
+summary{padding:6px 8px;font-weight:700;cursor:pointer;font-size:12px;border-bottom:2px solid var(--ink)}
+details[open] summary{background:var(--panel-2)}
+pre{margin:0;padding:8px;font:11px/1.35 "Courier New",monospace;white-space:pre-wrap;word-break:break-word;max-height:190px;overflow:auto}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:10px}
+.chk input{width:18px;height:18px;accent-color:var(--ink)}
+.thumb{width:76px;border:3px solid var(--ink);float:left;margin:0 10px 8px 0}
+@media (max-width:520px){
+  body{padding:4px}
+  .win{border-width:3px;box-shadow:5px 5px 0 var(--shadow)}
+  .tabs{gap:4px;padding:8px 8px 0}
+  .tab{font-size:12px;padding:9px 2px}
+  .pane{padding:10px}
+}
+@media print{
+  body{background:#fff;padding:0}
+  .titlebar,.menubar,.tabs,.statusbar,.overlay,.no-print,#stage,.btn{display:none !important}
+  .win{border:0;box-shadow:none;max-width:none}
+  .pane{display:none !important;padding:0}
+  .pane#pane-list{display:block !important}
+  .card{box-shadow:none;border-width:2px}
+  table{min-width:0;font-size:11px}
+  th{color:#000;background:#fff;border:2px solid #000}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
 </style>
 </head>
 <body>
-<div id="app">
 
-  <header class="topbar">
-    <div class="flight-field">
-      <label for="flightLabel">Vuelo</label>
-      <input id="flightLabel" placeholder="Ej. 9R 8839 · EOH–LPZ" autocomplete="off" />
+<div class="win">
+  <div class="titlebar">
+    <span class="grip" aria-hidden="true"></span>
+    <h1>ABORDAJE.EXE — Control de embarque</h1>
+    <button class="tbtn" id="themeBtn" title="Cambiar contraste">◐</button>
+  </div>
+
+  <div class="menubar">
+    <button data-act="csv">Exportar CSV</button>
+    <button data-act="print">Imprimir</button>
+    <button data-act="wipe">Borrar todo</button>
+    <button data-act="about">Acerca de</button>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-pane="scan">1. Escanear</button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="manual">2. Escribir</button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="list">3. Listado</button>
+  </div>
+
+  <!-- ESCANEAR -->
+  <section class="pane on" id="pane-scan" role="tabpanel">
+    <div class="card">
+      <h2>Tomar foto del pase</h2>
+      <div id="stage">
+        <video id="cam" playsinline muted autoplay style="display:none"></video>
+        <img id="shot" alt="Pase capturado" style="display:none">
+        <div class="ph" id="stagePh">Encuadra el pase completo, en vertical, sobre fondo oscuro y con buena luz. La letra impresa debe verse nítida.</div>
+        <div class="guide" id="guide" style="display:none"></div>
+      </div>
+
+      <button class="btn primary wide" id="btnFile">Tomar foto con la cámara</button>
+      <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+      <div class="row no-print">
+        <button class="btn" id="btnCam">Cámara en vivo</button>
+        <button class="btn" id="btnShoot" disabled>Capturar</button>
+      </div>
+
+      <div class="chk" style="margin-top:12px">
+        <input type="checkbox" id="optBw" checked>
+        <label for="optBw" style="margin:0">Alto contraste blanco/negro antes de leer</label>
+      </div>
+
+      <div class="bar" id="progWrap" style="display:none"><i id="progFill"></i><span id="progTxt">0%</span></div>
+      <div class="muted" id="ocrNote"></div>
     </div>
-    <div class="counter">
-      <span class="num" id="countNum">0</span>
-      <span class="lbl">abordados</span>
+
+    <div class="card">
+      <h2>Cómo funciona</h2>
+      <p class="muted">La app lee el texto impreso del pase (no el código PDF417, que en este formato es demasiado pequeño para la cámara de un celular). El reconocimiento nunca es perfecto: <strong>siempre</strong> vas a ver los datos en un formulario para corregirlos antes de sumarlos al listado.</p>
+      <p class="muted">Todo se procesa en el celular y se guarda solo en este navegador. Nada se envía a un servidor.</p>
     </div>
-  </header>
+  </section>
 
-  <main>
-    <button id="scanBtn" class="scan-btn">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M3 8V6a2 2 0 0 1 2-2h2M3 16v2a2 2 0 0 0 2 2h2M21 8V6a2 2 0 0 0-2-2h-2M21 16v2a2 2 0 0 1-2 2h-2M4 12h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      Escanear pase de abordar
-    </button>
-
-    <div class="toolbar">
-      <input id="searchInput" placeholder="Buscar pasajero…" />
-      <button class="btn-ghost" id="ocrBtn">OCR del pase</button>
-      <button class="btn-ghost" id="manualBtn">Manual</button>
-      <button class="btn-ghost" id="exportBtn">Exportar CSV</button>
-      <button class="btn-ghost danger" id="clearBtn">Vaciar</button>
+  <!-- MANUAL -->
+  <section class="pane" id="pane-manual" role="tabpanel">
+    <div class="card">
+      <h2>Escribir un pasajero</h2>
+      <div id="manualForm"></div>
+      <button class="btn primary wide" id="btnManualAdd">Agregar al listado</button>
+      <button class="btn wide" id="btnManualClear">Limpiar campos</button>
     </div>
+  </section>
 
-    <p class="empty" id="emptyState">Aún no has escaneado a nadie. Toca "Escanear pase de abordar" para comenzar.</p>
-    <ol class="manifest" id="passengerList"></ol>
-  </main>
+  <!-- LISTADO -->
+  <section class="pane" id="pane-list" role="tabpanel">
+    <div class="card">
+      <h2>Listado de abordaje</h2>
+      <div class="row no-print" style="margin-bottom:12px">
+        <div><label for="q">Buscar</label><input type="search" id="q" placeholder="Nombre, e-ticket, asiento"></div>
+        <div><label for="fFlight">Vuelo</label><select id="fFlight"><option value="">Todos</option></select></div>
+      </div>
+      <div id="listBox"></div>
+      <div class="row no-print" style="margin-top:12px">
+        <button class="btn" data-act="csv">Exportar CSV</button>
+        <button class="btn" data-act="print">Imprimir</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="statusbar">
+    <div id="sbPax">Pasajeros: 0</div>
+    <div id="sbDup">Repetidos bloqueados: 0</div>
+    <div id="sbBag">Equipaje: 0 pzs / 0 kg</div>
+  </div>
 </div>
 
-<!-- Overlay de cámara -->
-<div class="scan-overlay" id="scanOverlay" hidden>
-  <video id="video" playsinline muted></video>
-  <div class="viewfinder" aria-hidden="true">
-    <div class="corner tl"></div><div class="corner tr"></div>
-    <div class="corner bl"></div><div class="corner br"></div>
-  </div>
-  <p class="scan-status" id="scanStatus">Iniciando cámara…</p>
-  <p class="scan-diag" id="scanDiag"></p>
-  <div id="feedback" class="feedback" hidden></div>
-  <div class="zoom-quick" id="zoomQuick" hidden>
-    <button type="button" data-z="1">1×</button>
-    <button type="button" data-z="2">2×</button>
-    <button type="button" data-z="3">3×</button>
-    <button type="button" data-z="max">Máx</button>
-  </div>
-  <div class="zoom-row" id="zoomRow" hidden>
-    <span aria-hidden="true">🔍</span>
-    <input type="range" id="zoomInput" min="1" max="4" step="0.1" value="1" aria-label="Zoom">
-  </div>
-  <div class="scan-controls">
-    <button class="round-btn" id="torchBtn" hidden title="Linterna">🔦</button>
-    <button class="round-btn" id="photoBtn" title="Tomar foto y analizar">📷</button>
-    <button class="round-btn" id="fileBtn" title="Usar la cámara del sistema o una foto de la galería">🖼</button>
-    <button class="round-btn" id="ocrCamBtn" title="Leer los datos impresos (OCR)">🔤</button>
-    <button class="round-btn close" id="closeBtn" title="Cerrar">✕</button>
-  </div>
-</div>
-
-<input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
-<input type="file" id="ocrInput" accept="image/*" capture="environment" hidden />
-
-<!-- Revisión del OCR: el OCR NUNCA agrega solo, siempre pasa por aquí -->
-<div class="modal" id="ocrModal" hidden>
-  <div class="modal-card wide">
-    <h2>Revisar datos leídos del pase</h2>
-    <p id="ocrNote"></p>
-    <div class="ocr-grid" id="ocrForm"></div>
-    <div class="modal-actions">
-      <button class="secondary" id="ocrCancel">Cancelar</button>
-      <button class="primary" id="ocrSubmit">Agregar pasajero</button>
+<!-- DIALOGO REVISION -->
+<div class="overlay" id="ovReview">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="revTitle">
+    <div class="titlebar"><span class="grip"></span><h1 id="revTitle">Revisar datos leídos</h1>
+      <button class="tbtn" data-close="ovReview">X</button></div>
+    <div class="body">
+      <img id="revThumb" class="thumb" alt="">
+      <p class="muted" id="revHint"></p>
+      <div style="clear:both"></div>
+      <div id="reviewForm"></div>
+      <details><summary>Ver el texto que leyó la cámara</summary><pre id="revRaw"></pre></details>
+    </div>
+    <div class="foot">
+      <button class="btn" data-close="ovReview">Descartar</button>
+      <button class="btn primary" id="btnConfirmAdd">Agregar al listado</button>
     </div>
   </div>
 </div>
 
-<!-- Modal ingreso manual -->
-<div class="modal" id="manualModal" hidden>
-  <div class="modal-card">
-    <h2>Ingreso manual</h2>
-    <p>Si el código no se puede escanear (pase dañado, impresión borrosa), pega aquí el texto crudo del código de barras (formato IATA BCBP, el que empieza con "M1…").</p>
-    <textarea id="manualInput" rows="3" placeholder="M1APELLIDOS/NOMBRE...."></textarea>
-    <div class="modal-actions">
-      <button class="secondary" id="manualCancel">Cancelar</button>
-      <button class="primary" id="manualSubmit">Agregar</button>
-    </div>
+<!-- DIALOGO MENSAJE -->
+<div class="overlay" id="ovMsg">
+  <div class="dlg" style="max-width:380px" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+    <div class="titlebar"><span class="grip"></span><h1 id="msgTitle">Aviso</h1>
+      <button class="tbtn" data-close="ovMsg">X</button></div>
+    <div class="body"><div id="msgBody"></div></div>
+    <div class="foot" id="msgFoot"><button class="btn primary" data-close="ovMsg">Aceptar</button></div>
   </div>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<canvas id="work" hidden></canvas>
 
-<!-- Motor principal en JS: zxing-wasm (compilación WebAssembly de zxing-cpp).
-     Decodifica PDF417 bastante mejor que el port JS puro. -->
-<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
-<!-- Último respaldo si el wasm no carga (red bloqueada, navegador viejo). -->
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 (function(){
-  "use strict";
+"use strict";
 
-  /* =========================================================
-     1. DICCIONARIOS EDITABLES
-     Satena cubre aeropuertos regionales colombianos que no
-     siempre aparecen en bases de datos IATA genéricas. Agrega
-     aquí los códigos que uses.
-  ==========================================================*/
-  var AIRPORTS = {
-    EOH: "Olaya Herrera (Medellín)",
-    LPZ: "Los Pozos (San Gil)"
-    // Agrega más rutas propias aquí, ej: "ADZ": "Providencia"
-  };
-  var CLASSES = { Y:"Económica", C:"Ejecutiva", F:"Primera" };
+/* ---------- utilidades ---------- */
+var $ = function(s,r){ return (r||document).querySelector(s); };
+var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); };
 
-  /* =========================================================
-     2. PARSER BCBP (IATA Bar Coded Boarding Pass)
-     Los campos obligatorios (nombre, PNR, ruta, vuelo, asiento)
-     tienen posición FIJA según el estándar y son 100% confiables.
-     El número de tiquete vive en una sección de longitud variable
-     que el estándar no fija de forma universal: aquí se extrae
-     con una heurística (última racha larga de dígitos) que se
-     validó contra el ejemplo real de Satena. Revisa el campo
-     "ticketConfidence" si necesitas saber qué tan segura es.
-  ==========================================================*/
-  function parseBCBP(raw){
-    if (typeof raw !== "string") return { valid:false, raw:String(raw||"") };
-    var clean = raw.replace(/\n|\r/g,"");
-    if (clean.length < 58 || clean[0] !== "M") {
-      return { valid:false, raw: clean };
-    }
-    var f = function(a,b){ return clean.slice(a,b); };
-    var nameField = f(2,22).trim();
-    var apellidos = nameField, nombres = "";
-    if (nameField.indexOf("/") !== -1){
-      var parts = nameField.split("/");
-      apellidos = parts[0]; nombres = parts.slice(1).join(" ");
-    }
-    var pnr = f(23,30).trim();
-    var from = f(30,33).trim();
-    var to = f(33,36).trim();
-    var carrier = f(36,39).trim();
-    var flightNum = f(39,44).trim();
-    var julianDay = f(44,47).trim();
-    var compartment = f(47,48).trim();
-    var seatRaw = f(48,52);
-    var checkin = f(52,57).trim();
-    var paxStatus = f(57,58).trim();
+var FIELDS = [
+  {k:"name",   l:"Nombre (APELLIDO/NOMBRE)"},
+  {k:"eticket",l:"E-ticket"},
+  {k:"flight", l:"Vuelo"},
+  {k:"date",   l:"Fecha"},
+  {k:"doc",    l:"Documento"},
+  {k:"seat",   l:"Asiento"},
+  {k:"time",   l:"Hora"},
+  {k:"cls",    l:"Clase"},
+  {k:"from",   l:"Origen"},
+  {k:"to",     l:"Destino"},
+  {k:"bagPcs", l:"Piezas"},
+  {k:"bagKg",  l:"Kilos"}
+];
+var IATA = {"SAN GIL":"LPZ","MEDELLIN":"EOH","MEDELLÍN":"EOH"};
 
-    var seat = null;
-    var seatRow = parseInt(seatRaw.slice(0,3),10);
-    var seatLetter = seatRaw.slice(3,4).trim();
-    if (!isNaN(seatRow) && seatLetter) seat = String(seatRow)+seatLetter;
+var state = { pax:[], dup:0 };
+var pending = null;
 
-    var ticketNumber = null, ticketConfidence = "none";
-    var tail = clean.slice(58);
-    var runs = tail.match(/\d{10,}/g);
-    if (runs && runs.length){
-      var lastRun = runs[runs.length-1];
-      ticketNumber = lastRun.slice(0,13);
-      ticketConfidence = lastRun.length >= 13 ? "heuristica" : "parcial";
-    }
+/* ---------- almacenamiento ---------- */
+function save(){
+  try{ localStorage.setItem("abordaje.v1", JSON.stringify(state)); }catch(e){}
+}
+function load(){
+  try{
+    var raw = localStorage.getItem("abordaje.v1");
+    if(raw){ var o = JSON.parse(raw); if(o && Array.isArray(o.pax)){ state.pax=o.pax; state.dup=o.dup||0; } }
+  }catch(e){ state.pax=[]; state.dup=0; }
+}
 
-    apellidos = apellidos.trim(); nombres = nombres.trim();
-
-    return {
-      valid:true, raw:clean,
-      apellidos:apellidos, nombres:nombres,
-      nombreCompleto: nombres ? (nombres+" "+apellidos) : apellidos,
-      pnr:pnr, origen:from, destino:to,
-      aerolinea:carrier, vuelo:flightNum,
-      vueloCompleto: (carrier+" "+flightNum).trim(),
-      diaJuliano:julianDay, clase:compartment,
-      asiento:seat, secuenciaCheckin:checkin, estadoPasajero:paxStatus,
-      ticketNumber:ticketNumber, ticketConfidence:ticketConfidence
-    };
-  }
-
-  /* El número de tiquete va con 13 dígitos en el código de barras
-     (0 + 12) y con 12 impreso en el pase. Se normaliza a 13 para que
-     un mismo pasajero leído por código y por OCR sea el mismo. */
-  function normTicket(t){
-    t = String(t||"").replace(/\D/g,"");
-    return t.length === 12 ? "0"+t : t;
-  }
-
-  /* Un pasajero puede coincidir por varias llaves. Se compara por
-     conjuntos porque el OCR a veces falla justo en el tiquete: si sólo
-     se usara ésa, un duplicado se colaría. */
-  function keySet(p){
-    var ks = [];
-    var t = p.ticketNumber ? normTicket(p.ticketNumber) : "";
-    if (t && p.ticketConfidence !== "none") ks.push("T:"+t);
-    var nm = ((p.apellidos||"")+"|"+(p.nombres||"")).toUpperCase().replace(/\s+/g,"");
-    var fl = ((p.aerolinea||"")+(p.vuelo||"")).toUpperCase();
-    if (nm.replace(/\|/g,"")) ks.push("N:"+nm+"|"+fl);
-    if (p.pnr) ks.push("P:"+p.pnr+"|"+nm);
-    return ks;
-  }
-  function keysOf(x){
-    if (x._keys && x._keys.length) return x._keys;
-    return x._key ? [x._key] : [];
-  }
-  function isDuplicate(keys){
-    return state.passengers.some(function(x){
-      return keysOf(x).some(function(k){ return keys.indexOf(k) !== -1; });
-    });
-  }
-
-  function toTitle(s){
-    return (s||"").toLowerCase().replace(/(^|\s|\/)([a-záéíóúñ])/g, function(m,sep,c){ return sep+c.toUpperCase(); });
-  }
-
-  /* =========================================================
-     3. ESTADO Y PERSISTENCIA (localStorage)
-  ==========================================================*/
-  var STORAGE_KEY = "manifiesto_abordaje_v1";
-  var state = { flight:"", passengers:[] };
-
-  function loadState(){
-    try{
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw){
-        var parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.passengers)) state = parsed;
-      }
-    }catch(e){ /* almacenamiento no disponible: seguimos solo en memoria */ }
-  }
-  function saveState(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-  }
-
-  /* =========================================================
-     4. RENDER
-  ==========================================================*/
-  var els = {
-    flightLabel: document.getElementById("flightLabel"),
-    countNum: document.getElementById("countNum"),
-    list: document.getElementById("passengerList"),
-    empty: document.getElementById("emptyState"),
-    search: document.getElementById("searchInput"),
-    toast: document.getElementById("toast")
-  };
-
-  var toastTimer = null;
-  function showToast(msg){
-    els.toast.textContent = msg;
-    els.toast.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function(){ els.toast.hidden = true; }, 2600);
-  }
-
-  function airportLabel(code){
-    return AIRPORTS[code] ? code+" · "+AIRPORTS[code] : code;
-  }
-
-  function render(){
-    els.flightLabel.value = state.flight || "";
-    els.countNum.textContent = state.passengers.length;
-    els.empty.style.display = state.passengers.length ? "none" : "block";
-    els.list.innerHTML = "";
-
-    var q = (els.search.value||"").trim().toLowerCase();
-
-    state.passengers.forEach(function(p, idx){
-      var hay = (p.nombreCompleto+" "+p.pnr+" "+p.asiento).toLowerCase();
-      if (q && hay.indexOf(q) === -1) return;
-
-      var li = document.createElement("li");
-      li.className = "row";
-
-      var seq = document.createElement("div");
-      seq.className = "seq"; seq.textContent = (idx+1)+".";
-
-      var info = document.createElement("div");
-      info.className = "info";
-      var name = document.createElement("div");
-      name.className = "name";
-      name.textContent = toTitle(p.nombreCompleto);
-      var meta = document.createElement("div");
-      meta.className = "meta";
-      var bits = [];
-      if (p.vueloCompleto) bits.push(p.vueloCompleto);
-      if (p.origen || p.destino) bits.push((p.origen||"?")+"→"+(p.destino||"?"));
-      if (p.asiento) bits.push("Asiento "+p.asiento);
-      if (p.pnr) bits.push("PNR "+p.pnr);
-      if (p.ticketNumber) bits.push("Tkt "+p.ticketNumber);
-      if (p.source === "ocr") bits.push("OCR");
-      meta.textContent = bits.join("  ·  ");
-      info.appendChild(name); info.appendChild(meta);
-
-      var del = document.createElement("button");
-      del.className = "del"; del.setAttribute("aria-label","Eliminar");
-      del.textContent = "×";
-      del.addEventListener("click", function(){
-        if (confirm("¿Quitar a "+toTitle(p.nombreCompleto)+" de la lista?")){
-          state.passengers.splice(idx,1);
-          saveState(); render();
-        }
-      });
-
-      li.appendChild(seq); li.appendChild(info); li.appendChild(del);
-      els.list.appendChild(li);
-    });
-  }
-
-  els.flightLabel.addEventListener("input", function(){
-    state.flight = els.flightLabel.value; saveState();
+/* ---------- dialogos ---------- */
+function openOv(id){ $("#"+id).classList.add("on"); }
+function closeOv(id){ $("#"+id).classList.remove("on"); }
+function msg(title,html,buttons){
+  $("#msgTitle").textContent = title;
+  $("#msgBody").innerHTML = html;
+  var foot = $("#msgFoot"); foot.innerHTML = "";
+  (buttons || [{t:"Aceptar",p:true}]).forEach(function(b){
+    var el = document.createElement("button");
+    el.className = "btn" + (b.p ? " primary" : "");
+    el.textContent = b.t;
+    el.onclick = function(){ closeOv("ovMsg"); if(b.fn) b.fn(); };
+    foot.appendChild(el);
   });
-  els.search.addEventListener("input", render);
-
-  /* =========================================================
-     5. AGREGAR PASAJERO (con deduplicación)
-  ==========================================================*/
-  function commit(p){
-    var keys = keySet(p);
-    if (!keys.length) return { status:"invalid" };
-    if (isDuplicate(keys)) return { status:"duplicate", passenger:p };
-    p._keys = keys; p._key = keys[0];
-    p.scannedAt = new Date().toISOString();
-    state.passengers.push(p);
-    saveState(); render();
-    return { status:"added", passenger:p };
-  }
-
-  function addPassengerFromRaw(raw){
-    var p = parseBCBP(raw);
-    if (!p.valid) return { status:"invalid" };
-    p.source = "codigo";
-    return commit(p);
-  }
-
-  /* Alta desde campos sueltos: es la puerta que usa el OCR después de
-     que el agente confirma en el formulario de revisión. */
-  function addPassengerFromFields(f, source){
-    var parts = String(f.nombre||"").split("/");
-    var apellidos = (parts[0]||"").trim();
-    var nombres = parts.slice(1).join(" ").trim();
-    if (!apellidos && !nombres) return { status:"invalid" };
-    var p = {
-      valid:true, raw:"", source: source || "ocr",
-      apellidos:apellidos, nombres:nombres,
-      nombreCompleto: nombres ? (nombres+" "+apellidos) : apellidos,
-      pnr: f.pnr || "",
-      origen: f.origen || "", destino: f.destino || "",
-      aerolinea: f.aerolinea || "", vuelo: f.vuelo || "",
-      vueloCompleto: ((f.aerolinea||"")+" "+(f.vuelo||"")).trim(),
-      clase: f.clase || "", asiento: f.asiento || "",
-      documento: f.documento || "", fechaVuelo: f.fecha || "", horaVuelo: f.hora || "",
-      horaEmbarque: f.horaEmbarque || "", control: f.control || "", agente: f.agente || "",
-      ticketNumber: f.tiquete ? normTicket(f.tiquete) : null,
-      ticketConfidence: f.tiquete ? "ocr" : "none"
-    };
-    return commit(p);
-  }
-
-  /* =========================================================
-     6. ESCÁNER DE CÁMARA — optimizado para PDF417 PEQUEÑOS
-
-     El PDF417 de los pases de Satena es muy denso: unos 240
-     módulos de ancho metidos en ~3 cm de papel térmico. Eso deja
-     un módulo (la barra más fina) de aprox. 0,12 mm. Para que un
-     decodificador lo resuelva necesita, medido empíricamente:
-
-       · ~1,75 px por módulo si se le entrega la imagen tal cual
-       · ~1,0  px por módulo si la imagen se AMPLÍA x2 o x3 con
-         interpolación suave antes de decodificar
-
-     Es decir: ampliar por software antes de decodificar baja el
-     umbral casi a la mitad. Esa es la optimización central de
-     esta versión. Las otras tres son:
-
-       1) Recortar SOLO el recuadro del visor (ROI) del cuadro de
-          video, en resolución nativa, en vez de mandar el cuadro
-          completo. Los decodificadores reducen internamente las
-          imágenes grandes, y ahí se perdían las barras finas.
-       2) Empujar la cámara a la resolución máxima que acepte.
-       3) Usar zxing-wasm (zxing-cpp compilado a WebAssembly),
-          cuyo lector de PDF417 es bastante mejor que el port de
-          ZXing en JS puro, con tryHarder / denoise / binarizador
-          de promedio local (papel térmico mal iluminado).
-
-     Orden de motores: BarcodeDetector nativo → zxing-wasm →
-     @zxing/library (último recurso).
-  ==========================================================*/
-  var overlay    = document.getElementById("scanOverlay");
-  var video      = document.getElementById("video");
-  var scanStatus = document.getElementById("scanStatus");
-  var scanDiag   = document.getElementById("scanDiag");
-  var feedback   = document.getElementById("feedback");
-  var torchBtn   = document.getElementById("torchBtn");
-  var photoBtn   = document.getElementById("photoBtn");
-  var fileBtn    = document.getElementById("fileBtn");
-  var fileInput  = document.getElementById("fileInput");
-  var closeBtn   = document.getElementById("closeBtn");
-  var zoomRow    = document.getElementById("zoomRow");
-  var zoomInput  = document.getElementById("zoomInput");
-  var zoomQuick  = document.getElementById("zoomQuick");
-  var viewfinder = overlay.querySelector(".viewfinder");
-
-  var mediaStream = null, videoTrack = null;
-  var nativeDetector = null, wasmOK = false, jsReader = null;
-  var engineLabel = "", rafId = null;
-  var busy = false, scanLocked = false, torchOn = false;
-  var attempts = 0, lastDiag = 0, lastTick = 0, variantIdx = 0;
-  var scanStart = 0, hintShown = false;
-  var lastHit = "";
-
-  // Lienzo de trabajo reutilizado (evita crear uno por cuadro).
-  var workCanvas = document.createElement("canvas");
-  var workCtx    = workCanvas.getContext("2d", { willReadFrequently:true });
-  var MAX_PIXELS = 8e6;   // techo por análisis (medido: ~90 ms a 5 MP con wasm)
-  var SCAN_EVERY = 110;   // ms entre análisis
-
-  var WASM_OPTS = {
-    formats: ["PDF417"],
-    tryHarder: true,
-    tryRotate: true,
-    tryInvert: true,
-    // OJO: tryDownscale debe quedar en true. No significa "reducir la
-    // imagen y perder detalle": zxing-cpp usa una pirámide de escalas
-    // para LOCALIZAR el símbolo dentro de la imagen, y luego lo lee a
-    // resolución plena. Ponerlo en false hace que no encuentre nada en
-    // imágenes grandes (medido: 0 lecturas con él desactivado).
-    tryDownscale: true,
-    tryDenoise: true,      // ayuda con el grano del papel térmico
-    binarizer: "LocalAverage",
-    minLineCount: 2,
-    maxNumberOfSymbols: 1
-  };
-
-  function setDiag(extra){
-    var res = video.videoWidth ? (video.videoWidth + "\u00d7" + video.videoHeight) : "?";
-    scanDiag.textContent = "Motor: " + (engineLabel || "-") +
-      " \u00b7 Video: " + res +
-      " \u00b7 An\u00e1lisis: " + attempts +
-      (lastHit ? " \u00b7 " + lastHit : "") +
-      (extra ? " \u00b7 " + extra : "");
-  }
-
-  /* --- Motores disponibles --- */
-  function chooseEngines(){
-    var labels = [];
-    var p1 = Promise.resolve().then(function(){
-      if (!("BarcodeDetector" in window)) return;
-      return window.BarcodeDetector.getSupportedFormats().then(function(f){
-        if (f && f.indexOf("pdf417") !== -1){
-          nativeDetector = new window.BarcodeDetector({ formats:["pdf417"] });
-          labels.push("nativo");
-        }
-      }).catch(function(){});
-    });
-
-    // Precalentar el wasm para que la primera lectura no se demore.
-    var p2 = Promise.resolve().then(function(){
-      if (!window.ZXingWASM || !window.ZXingWASM.readBarcodes) return;
-      var probe = document.createElement("canvas");
-      probe.width = 8; probe.height = 8;
-      var id = probe.getContext("2d").getImageData(0,0,8,8);
-      return window.ZXingWASM.readBarcodes(id, WASM_OPTS).then(function(){
-        wasmOK = true; labels.push("zxing-wasm");
-      }).catch(function(){});
-    });
-
-    return Promise.all([p1,p2]).then(function(){
-      if (typeof ZXing !== "undefined"){
-        try{ jsReader = new ZXing.PDF417Reader(); labels.push("zxing-js"); }catch(e){}
-      }
-      engineLabel = labels.join(" + ") || "";
-      return labels.length > 0;
-    });
-  }
-
-  /* --- Cámara: pedir la mayor resolución posible --- */
-  var CONSTRAINT_SETS = [
-    { video:{ facingMode:{ exact:"environment" }, width:{ ideal:3840 }, height:{ ideal:2160 } } },
-    { video:{ facingMode:{ exact:"environment" }, width:{ ideal:2560 }, height:{ ideal:1440 } } },
-    { video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
-    { video:{ facingMode:"environment" } },
-    { video:true }
-  ];
-
-  function getStream(i){
-    i = i || 0;
-    if (i >= CONSTRAINT_SETS.length) return Promise.reject(new Error("no-stream"));
-    return navigator.mediaDevices.getUserMedia(CONSTRAINT_SETS[i])
-      .catch(function(e){
-        if (e && (e.name === "NotAllowedError" || e.name === "SecurityError")) throw e;
-        return getStream(i + 1);
-      });
-  }
-
-  // Segundo intento: si el dispositivo declara poder dar más, se lo pedimos.
-  function pushMaxResolution(){
-    try{
-      if (!videoTrack || !videoTrack.getCapabilities) return Promise.resolve();
-      var caps = videoTrack.getCapabilities();
-      var cur  = videoTrack.getSettings ? videoTrack.getSettings() : {};
-      if (!caps || !caps.width || !caps.width.max) return Promise.resolve();
-      var target = Math.min(caps.width.max, 3840);
-      if (target <= (cur.width || 0)) return Promise.resolve();
-      return videoTrack.applyConstraints({
-        width:{ ideal: target },
-        height:{ ideal: Math.min(caps.height && caps.height.max || 2160, 2160) }
-      }).catch(function(){});
-    }catch(e){ return Promise.resolve(); }
-  }
-
-  /* --- Región de interés: el recuadro del visor, en píxeles de video ---
-     El <video> usa object-fit:contain, así que la imagen se escala hasta
-     caber entera y queda centrada con franjas. Deshacemos esa
-     transformación para saber qué trozo del cuadro real corresponde al
-     recuadro que ve el usuario. */
-  function roiRect(){
-    if (!video.videoWidth || !video.videoHeight) return null;
-    var vr = video.getBoundingClientRect();
-    var fr = viewfinder.getBoundingClientRect();
-    if (!vr.width || !fr.width) return null;
-
-    var scale = Math.min(vr.width / video.videoWidth, vr.height / video.videoHeight);
-    var dx = (vr.width  - video.videoWidth  * scale) / 2;
-    var dy = (vr.height - video.videoHeight * scale) / 2;
-
-    var x = (fr.left - vr.left - dx) / scale;
-    var y = (fr.top  - vr.top  - dy) / scale;
-    var w = fr.width  / scale;
-    var h = fr.height / scale;
-
-    // Margen de tolerancia: el usuario nunca encuadra perfecto.
-    var mx = w * 0.08, my = h * 0.55;
-    x -= mx; y -= my; w += 2*mx; h += 2*my;
-
-    x = Math.max(0, x); y = Math.max(0, y);
-    w = Math.min(w, video.videoWidth  - x);
-    h = Math.min(h, video.videoHeight - y);
-    if (w < 40 || h < 20) return null;
-    return { x:x, y:y, w:w, h:h };
-  }
-
-  /* --- Dibuja un recorte AMPLIADO en el lienzo de trabajo ---
-     La ampliación con interpolación suave es lo que permite leer
-     códigos con ~1 px por módulo. */
-  var stepCanvas = document.createElement("canvas");
-  var stepCtx    = stepCanvas.getContext("2d", { willReadFrequently:true });
-
-  function smooth(ctx){
-    ctx.imageSmoothingEnabled = true;
-    try{ ctx.imageSmoothingQuality = "high"; }catch(e){}
-  }
-
-  function drawScaled(src, sx, sy, sw, sh, factor){
-    sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
-    sw = Math.max(1, Math.round(sw)); sh = Math.max(1, Math.round(sh));
-    var f = factor;
-    if (sw*f * sh*f > MAX_PIXELS) f = Math.sqrt(MAX_PIXELS / (sw*sh));
-    if (f < 0.05) f = 0.05;
-
-    var tw = Math.max(1, Math.round(sw * f));
-    var th = Math.max(1, Math.round(sh * f));
-
-    // Ampliación PROGRESIVA: el remuestreo del canvas se degrada mucho
-    // cuando se amplía más de ~2x de una sola vez (medido: lecturas
-    // erráticas a x3 y x5, correctas a x2). Duplicar por pasos conserva
-    // bastante mejor el borde de las barras.
-    if (f > 2){
-      var cw = sw * 2, ch = sh * 2;
-      stepCanvas.width = Math.round(cw); stepCanvas.height = Math.round(ch);
-      smooth(stepCtx);
-      stepCtx.drawImage(src, sx, sy, sw, sh, 0, 0, stepCanvas.width, stepCanvas.height);
-      while (cw * 2 <= tw){
-        var pw = Math.round(cw), ph = Math.round(ch);
-        cw *= 2; ch *= 2;
-        var tmp = document.createElement("canvas");
-        tmp.width = Math.round(cw); tmp.height = Math.round(ch);
-        var tctx = tmp.getContext("2d"); smooth(tctx);
-        tctx.drawImage(stepCanvas, 0, 0, pw, ph, 0, 0, tmp.width, tmp.height);
-        stepCanvas = tmp; stepCtx = tctx;
-      }
-      workCanvas.width = tw; workCanvas.height = th;
-      smooth(workCtx);
-      workCtx.drawImage(stepCanvas, 0, 0, stepCanvas.width, stepCanvas.height, 0, 0, tw, th);
-      return workCanvas;
-    }
-
-    workCanvas.width = tw; workCanvas.height = th;
-    smooth(workCtx);
-    workCtx.drawImage(src, sx, sy, sw, sh, 0, 0, tw, th);
-    return workCanvas;
-  }
-
-  /* --- Decodificar un lienzo con TODOS los motores ---
-     Los tres motores se complementan y ninguno domina:
-       · BarcodeDetector nativo: el más rápido en Android.
-       · zxing-wasm (zxing-cpp): el mejor con códigos diminutos y bien
-         alineados, pero MEDIDO: falla con el símbolo inclinado ~3°.
-       · @zxing/library (JS): más lento y menos sensible al tamaño, pero
-         MEDIDO: es el único que lee los casos inclinados y desenfocados.
-     Por eso los tres corren en el bucle en vivo, no sólo como respaldo. */
-  function decodeJS(canvas){
-    if (!jsReader) return null;
-    // OJO: no se puede usar createBinaryBitmap(canvas): esa función espera
-    // un <video> y lee videoWidth/videoHeight, así que con un canvas lanza
-    // IndexSizeError. Hay que montar el BinaryBitmap a mano. La ruta por
-    // dataURL también funciona pero cuesta 150-400 ms; ésta ~100 ms.
-    try{
-      var src = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-      var bm  = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));
-      var res = jsReader.decode(bm);
-      return res ? res.getText() : null;
-    }catch(e){ return null; }   // NotFoundException en cada cuadro sin código
-  }
-
-  function decodeCanvas(canvas){
-    var step = nativeDetector
-      ? nativeDetector.detect(canvas)
-          .then(function(c){ return (c && c.length) ? c[0].rawValue : null; })
-          .catch(function(){ return null; })
-      : Promise.resolve(null);
-
-    return step.then(function(text){
-      if (text || !wasmOK) return text;
-      var id;
-      try{ id = workCtx.getImageData(0, 0, canvas.width, canvas.height); }
-      catch(e){ return null; }
-      return window.ZXingWASM.readBarcodes(id, WASM_OPTS)
-        .then(function(r){ return (r && r.length) ? r[0].text : null; })
-        .catch(function(){ return null; });
-    }).then(function(text){
-      return text || decodeJS(canvas);
-    });
-  }
-
-  /* --- Bucle en vivo: cada análisis prueba una variante distinta ---
-     Alternar variantes mantiene la fluidez y cubre tanto el caso
-     "código diminuto bien encuadrado" como "código fuera del recuadro". */
-  /* Orden pensado por probabilidad: primero el caso normal (el código
-     llena el visor), después los rescates para cuando el usuario no
-     puede acercarse más y el código queda pequeño dentro del recuadro.
-     Medido: recortar ajustado pesa más que ampliar mucho. */
-  var VARIANTS = [
-    { label:"ROI \u00d72",        crop:1.00, f:2 },
-    { label:"cuadro \u00d71",     crop:null, f:1 },
-    { label:"ROI \u00d71",        crop:1.00, f:1 },
-    { label:"ROI \u00d73",        crop:1.00, f:3 },
-    { label:"centro 55% \u00d72", crop:0.55, f:2 },
-    { label:"centro 30% \u00d72", crop:0.30, f:2 },
-    { label:"centro 40% \u00d73", crop:0.40, f:3 },
-    { label:"centro 20% \u00d73", crop:0.20, f:3 }
-  ];
-
-  function loop(){
-    rafId = requestAnimationFrame(loop);
-    if (busy || scanLocked || overlay.hidden || video.readyState < 2) return;
-    var now = Date.now();
-    if (now - lastTick < SCAN_EVERY) return;
-    lastTick = now;
-    busy = true;
-
-    var v   = VARIANTS[variantIdx % VARIANTS.length];
-    variantIdx++;
-    var roi = (v.crop !== null) ? roiRect() : null;
-    if (roi && v.crop < 1){
-      // Subrecorte centrado: si el código no llena el visor, acercarse
-      // por software permite ampliarlo mucho más dentro del techo de píxeles.
-      var cw = roi.w * v.crop, ch = roi.h * v.crop;
-      roi = { x: roi.x + (roi.w-cw)/2, y: roi.y + (roi.h-ch)/2, w: cw, h: ch };
-    }
-    var canvas;
-    try{
-      canvas = roi
-        ? drawScaled(video, roi.x, roi.y, roi.w, roi.h, v.f)
-        : drawScaled(video, 0, 0, video.videoWidth, video.videoHeight, 1);
-    }catch(e){ busy = false; return; }
-
-    var srcPx = roi ? Math.round(roi.w) : video.videoWidth;
-
-    // Si lleva un rato sin leer, no dejar al agente adivinando:
-    // hay dos rutas más y conviene decirlo en pantalla.
-    if (!hintShown && !lastHit && Date.now() - scanStart > 12000){
-      hintShown = true;
-      scanStatus.innerHTML = "No logro leer el c\u00f3digo. Sube el zoom y toca la pantalla para reenfocar.<br>" +
-        "Si sigue sin leer, usa <b>\ud83d\udd24</b> para leer los <b>datos impresos</b> del pase.";
-    }
-
-    decodeCanvas(canvas).then(function(text){
-      attempts++;
-      if (text && !scanLocked){
-        lastHit = "le\u00eddo con " + v.label;
-        handleDecoded(text);
-      }
-      if (Date.now() - lastDiag > 400){
-        lastDiag = Date.now();
-        setDiag(v.label + " \u00b7 recorte " + srcPx + "px \u2192 " + workCanvas.width + "px");
-      }
-    }).catch(function(){}).then(function(){ busy = false; });
-  }
-
-  function tryContinuousFocus(){
-    try{
-      if (!videoTrack || !videoTrack.getCapabilities) return;
-      var caps = videoTrack.getCapabilities();
-      if (caps && caps.focusMode && caps.focusMode.indexOf("continuous") !== -1){
-        videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(function(){});
-      }
-    }catch(e){}
-  }
-
-  // Tocar la pantalla vuelve a disparar el enfoque (clave con papel cerca).
-  function refocus(){
-    try{
-      if (!videoTrack || !videoTrack.getCapabilities) return;
-      var caps = videoTrack.getCapabilities();
-      if (!caps || !caps.focusMode) return;
-      var single = caps.focusMode.indexOf("single-shot") !== -1;
-      var cont   = caps.focusMode.indexOf("continuous")  !== -1;
-      if (single && cont){
-        videoTrack.applyConstraints({ advanced:[{ focusMode:"single-shot" }] })
-          .then(function(){
-            setTimeout(function(){
-              videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(function(){});
-            }, 900);
-          }).catch(function(){});
-      }
-    }catch(e){}
-  }
-
-  function setupTorch(){
-    try{
-      if (!videoTrack || !videoTrack.getCapabilities) return;
-      var caps = videoTrack.getCapabilities();
-      if (caps && caps.torch){
-        torchBtn.hidden = false;
-        torchBtn.onclick = function(){
-          torchOn = !torchOn;
-          videoTrack.applyConstraints({ advanced:[{ torch: torchOn }] }).catch(function(){});
-          torchBtn.classList.toggle("on", torchOn);
-        };
-      }
-    }catch(e){}
-  }
-
-  function applyZoom(val){
-    if (!videoTrack) return;
-    videoTrack.applyConstraints({ advanced:[{ zoom: val }] }).catch(function(){});
-    zoomInput.value = val;
-  }
-
-  function setupZoom(){
-    try{
-      if (!videoTrack || !videoTrack.getCapabilities) return;
-      var caps = videoTrack.getCapabilities();
-      if (!caps || !caps.zoom || !(caps.zoom.max > caps.zoom.min)) return;
-
-      zoomRow.hidden = false; zoomQuick.hidden = false;
-      zoomInput.min  = caps.zoom.min;
-      zoomInput.max  = caps.zoom.max;
-      zoomInput.step = caps.zoom.step || 0.1;
-      var cur = videoTrack.getSettings ? videoTrack.getSettings().zoom : null;
-      zoomInput.value = cur || caps.zoom.min;
-      zoomInput.oninput = function(){ applyZoom(parseFloat(zoomInput.value)); };
-
-      Array.prototype.forEach.call(zoomQuick.querySelectorAll("button"), function(b){
-        var target = b.dataset.z === "max" ? caps.zoom.max : parseFloat(b.dataset.z);
-        if (target > caps.zoom.max) { b.hidden = true; return; }
-        b.hidden = false;
-        b.onclick = function(){
-          applyZoom(target);
-          Array.prototype.forEach.call(zoomQuick.querySelectorAll("button"), function(o){ o.classList.remove("on"); });
-          b.classList.add("on");
-        };
-      });
-    }catch(e){}
-  }
-
-  function openScanner(){
-    overlay.hidden = false;
-    feedback.hidden = true;
-    torchBtn.hidden = true; torchOn = false;
-    zoomRow.hidden = true; zoomQuick.hidden = true;
-    attempts = 0; variantIdx = 0; lastHit = ""; scanStart = Date.now(); hintShown = false;
-    scanLocked = false; busy = false;
-    scanDiag.textContent = "";
-    scanStatus.textContent = "Iniciando c\u00e1mara\u2026";
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      scanStatus.innerHTML = "Este navegador no expone la c\u00e1mara a la p\u00e1gina.<br>" +
-        "Ocurre al abrir el archivo directamente (<code>file://</code>): hay que servirlo por " +
-        "<b>https://</b> o <b>localhost</b>. Mientras tanto puedes usar 🖼 o el ingreso manual.";
-      return;
-    }
-
-    chooseEngines().then(function(ok){
-      if (!ok){
-        scanStatus.textContent = "No hay ning\u00fan lector de c\u00f3digos disponible " +
-          "(el navegador no trae uno nativo y las librer\u00edas no cargaron: revisa la conexi\u00f3n).";
-        return;
-      }
-      setDiag();
-      return getStream(0).then(function(stream){
-        mediaStream = stream;
-        videoTrack  = stream.getVideoTracks()[0];
-        return pushMaxResolution().then(function(){
-          setupTorch();
-          setupZoom();
-          tryContinuousFocus();
-          video.srcObject = mediaStream;
-          video.setAttribute("playsinline","");
-          var pl = video.play();
-          if (pl && pl.catch) pl.catch(function(){});
-          scanStatus.textContent = "Llena el recuadro con el c\u00f3digo de barras. " +
-            "Si no lee, sube el zoom y toca la pantalla para reenfocar.";
-          setDiag();
-          loop();
-        });
-      });
-    }).catch(function(e){
-      var msg = "No se pudo acceder a la c\u00e1mara.";
-      if (e && e.name === "NotAllowedError") msg = "Permiso de c\u00e1mara denegado. Act\u00edvalo en los ajustes del navegador para este sitio.";
-      else if (e && e.name === "NotFoundError") msg = "No se encontr\u00f3 ninguna c\u00e1mara en este dispositivo.";
-      else if (e && e.name === "NotReadableError") msg = "La c\u00e1mara est\u00e1 ocupada por otra app. Ci\u00e9rrala e int\u00e9ntalo de nuevo.";
-      scanStatus.textContent = msg;
-    });
-  }
-
-  /* --- Plan B: foto a resolución de sensor ---
-     El encuadre de la foto puede no coincidir con el del video (es un
-     comportamiento conocido de ImageCapture), así que en vez de usar el
-     ROI del visor se prueban varios recortes centrados y varias
-     ampliaciones, de lo más ajustado a lo más amplio. */
-  function grabBitmap(){
-    return Promise.resolve().then(function(){
-      if (window.ImageCapture && videoTrack){
-        var ic = new window.ImageCapture(videoTrack);
-        return ic.takePhoto()
-          .then(function(blob){ return createImageBitmap(blob); })
-          .catch(function(){ return ic.grabFrame(); });
-      }
-      throw new Error("no-imagecapture");
-    }).catch(function(){
-      var c = document.createElement("canvas");
-      c.width  = video.videoWidth  || 1280;
-      c.height = video.videoHeight || 720;
-      c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
-      return createImageBitmap(c);
-    });
-  }
-
-  // Recortes centrados (fracción del ancho) × factores de ampliación.
-  var STILL_PASSES = [
-    { frac:0.55, f:3 }, { frac:0.55, f:2 },
-    { frac:0.80, f:2 }, { frac:0.80, f:1.5 },
-    { frac:1.00, f:1.5 }, { frac:1.00, f:1 },
-    { frac:0.35, f:4 }
-  ];
-
-  function decodeFromSource(src, srcW, srcH, statusEl){
-    var i = 0;
-    function next(){
-      if (i >= STILL_PASSES.length) return Promise.resolve(null);
-      var p = STILL_PASSES[i++];
-      var w = srcW * p.frac;
-      var h = srcH * p.frac;
-      var x = (srcW - w) / 2;
-      var y = (srcH - h) / 2;
-      var canvas;
-      try{ canvas = drawScaled(src, x, y, w, h, p.f); }
-      catch(e){ return next(); }
-      if (statusEl){
-        statusEl.textContent = "Analizando\u2026 (" + i + "/" + STILL_PASSES.length + ")";
-      }
-      return decodeCanvas(canvas).then(function(text){
-        if (text){ lastHit = "le\u00eddo en foto, recorte " + Math.round(p.frac*100) + "% \u00d7" + p.f; return text; }
-        return next();
-      });
-    }
-    return next();
-  }
-
-  function decodeStill(){
-    if (scanLocked || !mediaStream) return;
-    scanStatus.textContent = "Analizando foto\u2026";
-    var wasBusy = busy; busy = true;   // pausa el bucle mientras tanto
-    grabBitmap().then(function(bmp){
-      setDiag("foto " + bmp.width + "\u00d7" + bmp.height);
-      return decodeFromSource(bmp, bmp.width, bmp.height, scanStatus);
-    }).then(function(text){
-      busy = false;
-      if (video.paused){ var pl = video.play(); if (pl && pl.catch) pl.catch(function(){}); }
-      if (text) handleDecoded(text);
-      else scanStatus.textContent = "En esa foto no se ley\u00f3 ning\u00fan PDF417. " +
-        "Ac\u00e9rcate hasta ~12 cm, sube el zoom, aplana el papel y evita reflejos. " +
-        "Si sigue sin leer, prueba 🖼 (c\u00e1mara del sistema).";
-    }).catch(function(){
-      busy = wasBusy;
-      scanStatus.textContent = "No se pudo capturar la foto.";
-    });
-  }
-
-  /* --- Plan C: imagen tomada con la cámara nativa del teléfono o de la galería ---
-     La app de cámara del sistema usa el sensor completo, autoenfoque macro,
-     HDR y estabilización: en la práctica saca mucho más detalle que un
-     stream de video. Esta ruta funciona incluso sin permiso de cámara web. */
-  function handleFile(file){
-    if (!file) return;
-    var wasOpen = !overlay.hidden;
-    if (wasOpen) scanStatus.textContent = "Analizando imagen\u2026";
-    else showToast("Analizando imagen\u2026");
-
-    createImageBitmap(file).then(function(bmp){
-      return decodeFromSource(bmp, bmp.width, bmp.height, wasOpen ? scanStatus : null)
-        .then(function(text){
-          if (text){
-            if (wasOpen) handleDecoded(text);
-            else {
-              var res = addPassengerFromRaw(text);
-              if (res.status === "added") showToast("Agregado: "+toTitle(res.passenger.nombreCompleto));
-              else if (res.status === "duplicate") showToast("Ese pasajero ya estaba en la lista");
-              else showToast("Se ley\u00f3 un c\u00f3digo, pero no es un pase IATA");
-            }
-          } else {
-            var m = "No se encontr\u00f3 un PDF417 legible en esa imagen. " +
-                    "Rep\u00edtela m\u00e1s cerca y solo del c\u00f3digo de barras.";
-            if (wasOpen) scanStatus.textContent = m; else showToast(m);
-          }
-        });
-    }).catch(function(){
-      var m = "No se pudo leer esa imagen.";
-      if (wasOpen) scanStatus.textContent = m; else showToast(m);
-    });
-  }
-
-  function handleDecoded(rawText){
-    var res = addPassengerFromRaw(rawText);
-    scanLocked = true;
-
-    if (navigator.vibrate) navigator.vibrate(res.status === "added" ? 80 : [40,60,40]);
-
-    feedback.hidden = false;
-    if (res.status === "added"){
-      feedback.className = "feedback ok";
-      feedback.innerHTML = "<b>Agregado \u2713</b>"+toTitle(res.passenger.nombreCompleto)+
-        (res.passenger.asiento ? " \u00b7 Asiento "+res.passenger.asiento : "");
-    } else if (res.status === "duplicate"){
-      feedback.className = "feedback dup";
-      feedback.innerHTML = "<b>Ya estaba en la lista</b>"+toTitle(res.passenger.nombreCompleto);
-    } else {
-      feedback.className = "feedback dup";
-      feedback.innerHTML = "<b>C\u00f3digo le\u00eddo, pero no es un pase</b>El c\u00f3digo se decodific\u00f3 bien, " +
-        "pero su contenido no tiene formato IATA BCBP (no empieza por \u201cM1\u201d).";
-    }
-
-    setTimeout(function(){
-      feedback.hidden = true;
-      scanLocked = false;
-      if (!overlay.hidden) scanStatus.textContent = "Llena el recuadro con el c\u00f3digo de barras.";
-    }, 1700);
-  }
-
-  function closeScanner(){
-    overlay.hidden = true;
-    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
-    jsReader = null;
-    nativeDetector = null;
-    if (mediaStream){
-      mediaStream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
-      mediaStream = null;
-    }
-    videoTrack = null;
-    try{ video.srcObject = null; }catch(e){}
-    busy = false; scanLocked = false;
-  }
-
-  document.getElementById("scanBtn").addEventListener("click", openScanner);
-  closeBtn.addEventListener("click", closeScanner);
-  photoBtn.addEventListener("click", decodeStill);
-  fileBtn.addEventListener("click", function(){ fileInput.click(); });
-  fileInput.addEventListener("change", function(){
-    var f = fileInput.files && fileInput.files[0];
-    fileInput.value = "";
-    handleFile(f);
-  });
-  video.addEventListener("click", refocus);
-
-  /* =========================================================
-     6B. RESPALDO POR OCR — leer los datos IMPRESOS del pase
-
-     Cuando el PDF417 no se deja leer (impresión gastada, papel
-     arrugado, código demasiado pequeño para la cámara), todos los
-     datos que necesita el manifiesto están impresos en claro en el
-     mismo pase. Este módulo los lee con Tesseract.
-
-     REGLA DE DISEÑO: el OCR NUNCA agrega un pasajero por su cuenta.
-     Siempre abre un formulario de revisión con lo que leyó, para que
-     el agente confirme o corrija. Medido sobre una foto real de un
-     pase de Satena: el nombre, el documento, el vuelo, la fecha, la
-     hora, la ruta y el equipaje salieron correctos en las tres
-     pasadas, pero el NÚMERO DE TIQUETE salió distinto entre pasadas
-     (…279858 vs …379858) y el asiento se confundió entre 5B y 58.
-     Con dígitos de ~14 px de alto eso no se arregla con software.
-
-     Mitigaciones implementadas:
-       · Tres pasadas con preprocesado distinto y voto por campo.
-       · Validación por campo: entre los candidatos se prefiere el que
-         cumple el formato esperado (así "5B" le gana a "58").
-       · Los campos donde las pasadas no coincidieron se marcan con ⚠
-         en el formulario para que el agente los mire sí o sí.
-  ==========================================================*/
-
-  // Las ciudades vienen impresas con nombre, no con código IATA.
-  // Amplía este diccionario con las rutas que uses.
-  var CITY_TO_IATA = {
-    "SAN GIL":"LPZ", "MEDELLIN":"EOH", "BOGOTA":"BOG",
-    "VILLAVICENCIO":"VVC", "PROVIDENCIA":"PVA", "SAN ANDRES":"ADZ"
-  };
-
-  var TESS_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
-  var tessLoading = null;
-
-  // Se carga sólo cuando se usa: son ~3 MB entre librería y datos de
-  // idioma, y no tiene sentido pagarlos si el código de barras sí lee.
-  function loadTesseract(){
-    if (window.Tesseract) return Promise.resolve(true);
-    if (tessLoading) return tessLoading;
-    tessLoading = new Promise(function(resolve){
-      var s = document.createElement("script");
-      s.src = TESS_URL;
-      s.onload  = function(){ resolve(!!window.Tesseract); };
-      s.onerror = function(){ resolve(false); };
-      document.head.appendChild(s);
-    });
-    return tessLoading;
-  }
-
-  /* --- Preprocesado --- */
-  function toCanvas(src, w, h, targetW, threshold){
-    var f = targetW / w;
-    var c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(w*f));
-    c.height = Math.max(1, Math.round(h*f));
-    var x = c.getContext("2d", { willReadFrequently:true });
-    x.imageSmoothingEnabled = true;
-    try{ x.imageSmoothingQuality = "high"; }catch(e){}
-    x.drawImage(src, 0, 0, w, h, 0, 0, c.width, c.height);
-    if (threshold){
-      var d = x.getImageData(0,0,c.width,c.height), p = d.data;
-      var hist = new Array(256); for (var q=0;q<256;q++) hist[q]=0;
-      var g, i;
-      for (i=0;i<p.length;i+=4){
-        g = (p[i]*299 + p[i+1]*587 + p[i+2]*114) / 1000 | 0;
-        p[i]=p[i+1]=p[i+2]=g; hist[g]++;
-      }
-      var t = otsu(hist, (p.length/4)|0);
-      for (i=0;i<p.length;i+=4){
-        var v = p[i] < t ? 0 : 255;
-        p[i]=p[i+1]=p[i+2]=v;
-      }
-      x.putImageData(d,0,0);
-    }
-    return c;
-  }
-
-  // Umbral de Otsu: se adapta al contraste real del papel térmico,
-  // que varía mucho más que un umbral fijo.
-  function otsu(hist, total){
-    var sum = 0, i;
-    for (i=0;i<256;i++) sum += i*hist[i];
-    var sumB=0, wB=0, wF=0, mB, mF, max=0, between, thr=128;
-    for (i=0;i<256;i++){
-      wB += hist[i]; if (wB===0) continue;
-      wF = total - wB; if (wF===0) break;
-      sumB += i*hist[i];
-      mB = sumB/wB; mF = (sum-sumB)/wF;
-      between = wB*wF*(mB-mF)*(mB-mF);
-      if (between > max){ max = between; thr = i; }
-    }
-    return thr;
-  }
-
-  /* --- Parser de los campos impresos --- */
-  function ocrLines(text){
-    return String(text||"").toUpperCase()
-      .replace(/[\u2013\u2014]/g,"-")
-      .split(/\n+/)
-      .map(function(l){ return l.replace(/\s+/g," ").trim(); })
-      .filter(function(l){ return l.length>0; });
-  }
-  function findIdx(L,re,from){ for(var i=(from||0);i<L.length;i++) if(re.test(L[i])) return i; return -1; }
-  function nextMatch(L,start,re,span){
-    span = span||4;
-    for(var i=start;i<Math.min(L.length,start+span);i++){ var m=L[i].match(re); if(m) return m; }
+  openOv("ovMsg");
+}
+document.addEventListener("click",function(e){
+  var t = e.target.closest("[data-close]");
+  if(t) closeOv(t.getAttribute("data-close"));
+});
+
+/* ---------- analisis del texto ---------- */
+var MON = {ENE:"ENE",JAN:"ENE",FEB:"FEB",MAR:"MAR",ABR:"ABR",APR:"ABR",MAY:"MAY",JUN:"JUN",
+           JUL:"JUL",AGO:"AGO",AUG:"AGO",SEP:"SEP",SET:"SEP",OCT:"OCT",NOV:"NOV",DIC:"DIC",DEC:"DIC"};
+var MONRE = /\b(\d{1,2})\s*(ENE|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SET|OCT|NOV|DIC|DEC)\b/;
+var NOISE = /NIT|CALL\s*CENTER|LINEA|GRATUITA|WEB|SITE|WWW|AV\.|CALLE|BOGOTA|COLOMBIA|ENTRADA|INTERIOR/;
+var LABELS = /EQUIPAJE|BAGGAGE|TARJETA|EMBARQUE|BOARDING|PASS|FREQUENT|FLYER|CONTROL|AGENTE|TICKET|VUELO|FLIGHT|SEAT|ASIENTO|GATE|PUERTA|DOCUMENTO|IDENTIFICAC|PASAJERO|NOMBRE|NAME|CLASE|CLASS|FECHA|DATE|HORA|TIME|SATENA/;
+
+function toDigits(s){
+  return String(s).replace(/[OQD]/g,"0").replace(/[IL|]/g,"1").replace(/S/g,"5")
+                  .replace(/B/g,"8").replace(/Z/g,"2").replace(/G/g,"6").replace(/[^0-9]/g,"");
+}
+
+function parsePass(text){
+  var out = {name:"",eticket:"",flight:"",date:"",doc:"",seat:"",time:"",cls:"",from:"",to:"",bagPcs:"",bagKg:""};
+  if(!text) return out;
+  var clean = text.toUpperCase().replace(/[‘’`´]/g,"'").replace(/[—–]/g,"-");
+  var lines = clean.split(/\n+/).map(function(l){ return l.replace(/\s+/g," ").trim(); })
+                   .filter(function(l){ return l.length>0; });
+
+  function idx(re,from){ for(var i=(from||0);i<lines.length;i++){ if(re.test(lines[i])) return i; } return -1; }
+  function near(i,n,test){
+    for(var k=i;k<Math.min(i+(n||3),lines.length);k++){ var v=test(lines[k],k); if(v) return v; }
     return null;
   }
 
-  function parseOCR(text){
-    var L = ocrLines(text), o = {}, i, m, j;
+  /* nombre: APELLIDO/NOMBRE, sin espacio antes de la barra, sin digitos */
+  var nameOk = function(l){
+    if(NOISE.test(l) || LABELS.test(l) || l.indexOf("/")<0) return null;
+    if((l.match(/\d/g)||[]).length > 2) return null;
+    var f = l.replace(/0/g,"O").replace(/1/g,"I").replace(/5/g,"S")
+             .replace(/8/g,"B").replace(/6/g,"G").replace(/2/g,"Z");
+    var m = f.match(/^([A-ZÑ][A-ZÑ.'-]+)\/([A-ZÑ][A-ZÑ .'-]+)$/);
+    return m ? (m[1].trim()+"/"+m[2].trim()) : null;
+  };
+  var i = idx(/PASSENGER\s*NAME|NOMBRE\s*DE\s*PASAJERO/);
+  if(i>=0) out.name = near(i+1,3,nameOk) || "";
+  if(!out.name){
+    for(var a=0;a<lines.length;a++){ var v=nameOk(lines[a]); if(v){ out.name=v; break; } }
+  }
 
-    i = findIdx(L,/PASSENGER\s*NAME/);
-    if (i<0) i = findIdx(L,/NOMBRE\s+DE.?\s*PASA[JI]ER/);
-    if (i>=0){
-      for (j=i+1;j<Math.min(L.length,i+4);j++){
-        if (/^[A-ZÑ][A-ZÑ .'-]*\/[A-ZÑ][A-ZÑ .'-]*$/.test(L[j])){
-          o.nombre = L[j].replace(/\s*\/\s*/,"/"); break;
-        }
+  /* e-ticket */
+  i = idx(/E\s*-?\s*T\s*I\s*C\s*K\s*E\s*T/);
+  var grabLong = function(l){
+    if(NOISE.test(l)) return null;
+    var m = l.replace(/[^0-9A-Z ]/g," ").match(/\b[0-9OQILSBZG]{11,14}\b/);
+    if(!m) return null;
+    var d = toDigits(m[0]);
+    if(d.length<11 || d.length>14) return null;
+    if(/^019|^57|^8999991/.test(d)) return null;
+    return d;
+  };
+  if(i>=0) out.eticket = near(i,3,grabLong) || "";
+  if(!out.eticket){
+    for(var b=0;b<lines.length;b++){ var e=grabLong(lines[b]); if(e){ out.eticket=e; break; } }
+  }
+
+  /* fila vuelo / fecha / hora / clase */
+  var rowIdx = -1;
+  i = idx(/VUELO|FLIGHT/);
+  if(i>=0){ for(var k=i;k<Math.min(i+4,lines.length);k++){ if(MONRE.test(lines[k])){ rowIdx=k; break; } } }
+  if(rowIdx<0){ for(var c=0;c<lines.length;c++){ if(MONRE.test(lines[c]) && !NOISE.test(lines[c])){ rowIdx=c; break; } } }
+
+  if(rowIdx>=0){
+    var row = lines[rowIdx];
+    var dm = row.match(MONRE);
+    if(dm){
+      out.date = (dm[1].length===1?"0":"")+dm[1]+MON[dm[2]];
+      var before = row.slice(0, dm.index);
+      var after  = row.slice(dm.index + dm[0].length);
+      var fm = before.match(/\b([A-Z0-9]{2})\s*(\d{3,4})\b/);
+      if(fm) out.flight = fm[1]+fm[2];
+      var tm = after.match(/\b(\d{3,4})\b/);
+      if(tm){
+        out.time = tm[1].length===3 ? ("0"+tm[1]) : tm[1];
+        var cm = after.slice(tm.index+tm[1].length).match(/\b([A-Z])\b/);
+        if(cm) out.cls = cm[1];
       }
     }
-
-    i = findIdx(L,/IDENTIFICA/);
-    if (i>=0){ m = nextMatch(L,i+1,/^([A-Z]{0,3}\s?\d{5,15})$/,3); if(m) o.documento = m[1].replace(/\s/g,""); }
-
-    for (var k=0;k<L.length;k++){
-      m = L[k].match(/^([A-Z0-9]{2})\s*(\d{2,4})\s+(\d{1,2}[A-Z]{3})\s+(\d{3,4})\s+([A-Z])[A-Z]?$/);
-      if (m){ o.aerolinea=m[1]; o.vuelo=m[2]; o.fecha=m[3]; o.hora=m[4]; o.clase=m[5]; break; }
-    }
-
-    i = findIdx(L,/DE\s*\(\s*FROM|FROM\)\s*\/\s*A\s*\(|A\s*\(\s*T[DO]\s*\)/);
-    if (i>=0){
-      for (j=i+1;j<Math.min(L.length,i+4);j++){
-        m = L[j].match(/^([A-ZÑ .'-]{3,})\s*\/\s*([A-ZÑ .'-]{3,})$/);
-        if (m && !/\d/.test(L[j])){
-          o.ciudadOrigen = m[1].trim(); o.ciudadDestino = m[2].trim();
-          o.origen  = CITY_TO_IATA[o.ciudadOrigen]  || "";
-          o.destino = CITY_TO_IATA[o.ciudadDestino] || "";
-          break;
-        }
-      }
-    }
-
-    // OJO: sólo se busca DESPUÉS de la etiqueta E-TICKET. La línea
-    // gratuita del encabezado (019003317100) también tiene 12 dígitos
-    // y una búsqueda global la confundiría con el tiquete.
-    i = findIdx(L,/E\s*-?\s*TI[CG]/);
-    if (i>=0){ m = nextMatch(L,i+1,/(\d{11,14})/,3); if(m) o.tiquete = m[1]; }
-
-    for (k=0;k<L.length;k++){
-      m = L[k].match(/(\d{1,2})\s*\/\s*(\d{2,3})\s*KG/);
-      if (m){ o.equipajePiezas=m[1]; o.equipajeKg=m[2]; break; }
-    }
-
-    i = findIdx(L,/HORA\s+DE\s+EMBARQUE|B.?ARDING\s+TIME/);
-    if (i>=0){ m = nextMatch(L,i+1,/^(\d{3,4})$/,3); if(m) o.horaEmbarque=m[1]; }
-
-    var ci = findIdx(L,/CONTROL/), si = findIdx(L,/ASIENT|SEAT/);
-    var from = Math.max(ci,si);
-    if (from>=0){
-      m = nextMatch(L,from+1,/^(\d{2,4})\s+(\d{1,3}\s?[A-Z0-9])$/,4);
-      if (m){ o.control=m[1]; o.asiento=m[2].replace(/\s/g,""); }
-      else { m = nextMatch(L,from+1,/^(\d{1,3}[A-Z])$/,4); if(m) o.asiento=m[1]; }
-    }
-
-    for (k=0;k<L.length;k++){
-      m = L[k].match(/GATE\s+CONTROL\s+([A-Z0-9]{5,12})$/) || L[k].match(/^AGENTE\s+([A-Z0-9]{5,12})$/);
-      if (m){ o.agente=m[1]; break; }
-    }
-    if (!o.agente){
-      i = findIdx(L,/^AGENTE$/);
-      if (i>=0){ m = nextMatch(L,i+1,/^([A-Z0-9]{5,12})$/,3); if(m) o.agente=m[1]; }
-    }
-
-    return o;
+  }
+  if(!out.flight){
+    var gm = clean.replace(/\s+/g," ").match(/\b(9R)\s*(\d{3,4})\b/);
+    if(gm) out.flight = gm[1]+gm[2];
   }
 
-  /* --- Validación y voto entre pasadas --- */
-  var OCR_FIELDS = [
-    { k:"nombre",       lbl:"Nombre (APELLIDOS/NOMBRES)", re:/^[A-ZÑ .'-]+\/[A-ZÑ .'-]+$/ },
-    { k:"documento",    lbl:"Documento",                  re:/^[A-Z]{0,3}\d{5,15}$/ },
-    { k:"aerolinea",    lbl:"Aerolínea",                  re:/^[A-Z0-9]{2}$/ },
-    { k:"vuelo",        lbl:"Vuelo",                      re:/^\d{2,4}$/ },
-    { k:"fecha",        lbl:"Fecha",                      re:/^\d{1,2}[A-Z]{3}$/ },
-    { k:"hora",         lbl:"Hora",                       re:/^\d{3,4}$/ },
-    { k:"clase",        lbl:"Clase",                      re:/^[A-Z]$/ },
-    { k:"origen",       lbl:"Origen (IATA)",              re:/^[A-Z]{3}$/ },
-    { k:"destino",      lbl:"Destino (IATA)",             re:/^[A-Z]{3}$/ },
-    { k:"asiento",      lbl:"Asiento",                    re:/^\d{1,3}[A-Z]$/ },
-    { k:"tiquete",      lbl:"N.º de tiquete",             re:/^\d{12}$/ },
-    { k:"horaEmbarque", lbl:"Hora de embarque",           re:/^\d{3,4}$/ },
-    { k:"control",      lbl:"Control",                    re:/^\d{2,4}$/ },
-    { k:"agente",       lbl:"Agente",                     re:/^[A-Z0-9]{5,12}$/ }
-  ];
+  /* documento */
+  i = idx(/DOCUMENTO|IDENTIFICACION|IDENTIFICACIÓN/);
+  if(i>=0){
+    out.doc = near(i+1,3,function(l){
+      if(NOISE.test(l)) return null;
+      var m = l.match(/\b((?:PP|CC|TI|CE|PA|NUIP)\s?[A-Z0-9]{5,14}|[A-Z]{1,2}\d{5,12}|\d{6,12})\b/);
+      return m ? m[1].replace(/\s+/g,"") : null;
+    }) || "";
+  }
 
-  // El OCR confunde letras con dígitos en campos cortos. En el asiento
-  // la última posición SIEMPRE es letra, así que se puede reparar.
-  var DIGIT_TO_LETTER = { "8":"B", "0":"D", "1":"I", "5":"S", "6":"G", "2":"Z", "4":"A" };
-  function repair(k, v){
-    if (!v) return v;
-    if (k === "asiento"){
-      var m = v.match(/^(\d{1,3})([0-9])$/);
-      if (m && DIGIT_TO_LETTER[m[2]]) return m[1] + DIGIT_TO_LETTER[m[2]];
+  /* origen / destino */
+  i = idx(/FROM.*TO|DE\s*\(?FROM|A\s*\(?TO/);
+  var routeOk = function(l){
+    if(/\d/.test(l) || NOISE.test(l) || LABELS.test(l)) return null;
+    var m = l.match(/^([A-ZÑ][A-ZÑ .'-]*?)\s*\/\s*([A-ZÑ][A-ZÑ .'-]*)$/);
+    return m ? [m[1].trim(), m[2].trim()] : null;
+  };
+  var r = null;
+  if(i>=0) r = near(i+1,3,routeOk);
+  if(!r){ for(var d2=0;d2<lines.length;d2++){ var rr=routeOk(lines[d2]); if(rr && rr[0]!==out.name.split("/")[0]){ r=rr; break; } } }
+  if(r){ out.from=r[0]; out.to=r[1]; }
+
+  /* equipaje */
+  var bm = clean.replace(/\s+/g," ").match(/\b(\d{1,2})\s*\/\s*(\d{1,3})\s*K\s*G\b/);
+  if(bm){ out.bagPcs = String(parseInt(bm[1],10)); out.bagKg = String(parseInt(bm[2],10)); }
+
+  /* asiento */
+  i = idx(/ASIENTO|\bSEAT\b/);
+  if(i>=0){
+    out.seat = near(i,4,function(l){
+      var m = l.match(/\b(\d{1,2}\s?[A-F])\b/);
+      return m ? m[1].replace(/\s/g,"") : null;
+    }) || "";
+  }
+  return out;
+}
+
+/* ---------- imagen ---------- */
+function prepare(srcEl, bw){
+  var cv = $("#work"), cx = cv.getContext("2d", {willReadFrequently:true});
+  var w = srcEl.videoWidth || srcEl.naturalWidth || srcEl.width;
+  var h = srcEl.videoHeight || srcEl.naturalHeight || srcEl.height;
+  if(!w || !h) return null;
+  var max = 1500, sc = Math.min(1, max/Math.max(w,h));
+  cv.width = Math.round(w*sc); cv.height = Math.round(h*sc);
+  cx.drawImage(srcEl,0,0,cv.width,cv.height);
+  if(bw){
+    var im = cx.getImageData(0,0,cv.width,cv.height), p = im.data, hist = new Array(256).fill(0), i;
+    for(i=0;i<p.length;i+=4){
+      var g = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114)|0;
+      p[i]=p[i+1]=p[i+2]=g; hist[g]++;
     }
-    return v;
-  }
-
-  // Entre los candidatos de las pasadas se prefiere el que cumple el
-  // formato; entre los válidos, el más repetido. Si no todos coinciden,
-  // el campo se marca para revisión.
-  function mergeField(field, values){
-    var vals = values.map(function(v){ return repair(field.k, v); })
-                     .filter(function(v){ return v != null && v !== ""; });
-    if (!vals.length) return { value:"", flag:true, reason:"no se encontró" };
-    var valid = vals.filter(function(v){ return field.re.test(v); });
-    var pool = valid.length ? valid : vals;
-    var count = {}, best = pool[0], bestN = 0;
-    pool.forEach(function(v){ count[v]=(count[v]||0)+1; if(count[v]>bestN){bestN=count[v];best=v;} });
-    var allSame = vals.every(function(v){ return v === vals[0]; });
-    var ok = allSame && valid.length === vals.length && vals.length === values.length;
-    return {
-      value: best,
-      flag: !ok,
-      reason: !valid.length ? "formato dudoso" : (!allSame ? "las pasadas no coinciden" : "falta en alguna pasada")
-    };
-  }
-
-  /* --- Ejecutar el OCR sobre una imagen --- */
-  function runOCR(src, w, h, onStatus){
-    return loadTesseract().then(function(ok){
-      if (!ok) throw new Error("no-tesseract");
-      onStatus("Preparando el lector de texto…");
-      return window.Tesseract.createWorker("eng");
-    }).then(function(worker){
-      // Tres preprocesados distintos: el mismo pase se lee diferente
-      // según la escala y el umbral, y eso es justo lo que permite votar.
-      var variants = [
-        { w: Math.min(w, 2600), th:false },
-        { w: 1800,              th:false },
-        { w: 1800,              th:true  }
-      ];
-      var texts = [], idx = 0;
-      function step(){
-        if (idx >= variants.length) return worker.terminate().then(function(){ return texts; });
-        var v = variants[idx++];
-        onStatus("Leyendo el texto del pase… (" + idx + "/" + variants.length + ")");
-        var c = toCanvas(src, w, h, v.w, v.th);
-        return worker.recognize(c)
-          .then(function(r){ texts.push(r.data.text || ""); })
-          .catch(function(){ texts.push(""); })
-          .then(step);
-      }
-      return step();
-    }).then(function(texts){
-      var parsed = texts.map(parseOCR);
-      var merged = {}, flags = {}, anything = false;
-      OCR_FIELDS.forEach(function(f){
-        var r = mergeField(f, parsed.map(function(p){ return p[f.k]; }));
-        merged[f.k] = r.value; flags[f.k] = r;
-        if (r.value) anything = true;
-      });
-      // las ciudades sólo sirven para mostrar, no se votan
-      parsed.forEach(function(p){
-        if (!merged.ciudadOrigen && p.ciudadOrigen) merged.ciudadOrigen = p.ciudadOrigen;
-        if (!merged.ciudadDestino && p.ciudadDestino) merged.ciudadDestino = p.ciudadDestino;
-      });
-      return { fields:merged, flags:flags, ok:anything, rawTexts:texts };
-    });
-  }
-
-  /* --- Formulario de revisión --- */
-  var ocrModal   = document.getElementById("ocrModal");
-  var ocrForm    = document.getElementById("ocrForm");
-  var ocrNote    = document.getElementById("ocrNote");
-  var ocrSubmit  = document.getElementById("ocrSubmit");
-  var ocrCancel  = document.getElementById("ocrCancel");
-
-  function openReview(result){
-    ocrForm.innerHTML = "";
-    var nFlag = 0;
-    OCR_FIELDS.forEach(function(f){
-      var r = result.flags[f.k];
-      var wrap = document.createElement("label");
-      wrap.className = "ocr-field" + (r.flag ? " warn" : "");
-      var lab = document.createElement("span");
-      lab.textContent = f.lbl + (r.flag ? "  ⚠" : "  ✓");
-      lab.title = r.flag ? r.reason : "las tres pasadas coincidieron";
-      var inp = document.createElement("input");
-      inp.type = "text"; inp.value = r.value || "";
-      inp.dataset.k = f.k;
-      inp.autocapitalize = "characters"; inp.autocomplete = "off"; inp.spellcheck = false;
-      wrap.appendChild(lab); wrap.appendChild(inp);
-      ocrForm.appendChild(wrap);
-      if (r.flag) nFlag++;
-    });
-    var city = (result.fields.ciudadOrigen||"") + (result.fields.ciudadDestino ? " → "+result.fields.ciudadDestino : "");
-    ocrNote.innerHTML = "Revisa antes de agregar. " +
-      (nFlag ? "<b>"+nFlag+" campo(s) marcados con ⚠</b> porque las pasadas no coincidieron o el formato es dudoso." :
-               "Todas las pasadas coincidieron, pero verifica igual.") +
-      (city ? "<br>Ruta impresa: <b>"+city+"</b>" : "");
-    ocrModal.hidden = false;
-  }
-
-  function collectReview(){
-    var o = {};
-    Array.prototype.forEach.call(ocrForm.querySelectorAll("input"), function(inp){
-      o[inp.dataset.k] = (inp.value||"").trim().toUpperCase();
-    });
-    return o;
-  }
-
-  ocrCancel.addEventListener("click", function(){ ocrModal.hidden = true; });
-  ocrSubmit.addEventListener("click", function(){
-    var f = collectReview();
-    if (!f.nombre || f.nombre.indexOf("/") === -1){
-      showToast("El nombre debe ir como APELLIDOS/NOMBRES");
-      return;
+    var total = p.length/4, sum=0, sumB=0, wB=0, best=0, thr=128;
+    for(i=0;i<256;i++) sum += i*hist[i];
+    for(i=0;i<256;i++){
+      wB += hist[i]; if(!wB) continue;
+      var wF = total-wB; if(!wF) break;
+      sumB += i*hist[i];
+      var mB = sumB/wB, mF = (sum-sumB)/wF, between = wB*wF*(mB-mF)*(mB-mF);
+      if(between>best){ best=between; thr=i; }
     }
-    var res = addPassengerFromFields(f, "ocr");
-    ocrModal.hidden = true;
-    if (res.status === "added") showToast("Agregado (OCR): "+toTitle(res.passenger.nombreCompleto));
-    else showToast("Ese pasajero ya estaba en la lista");
+    for(i=0;i<p.length;i+=4){
+      var v = p[i] > thr ? 255 : 0;
+      p[i]=p[i+1]=p[i+2]=v;
+    }
+    cx.putImageData(im,0,0);
+  }
+  return cv;
+}
+
+/* ---------- OCR ---------- */
+var tessWorker = null, tessTried = false;
+
+function loadScript(src){
+  return new Promise(function(res,rej){
+    var s = document.createElement("script");
+    s.src = src; s.onload = res; s.onerror = function(){ rej(new Error("no cargó "+src)); };
+    document.head.appendChild(s);
   });
-
-  /* --- Lanzar el OCR desde una imagen --- */
-  var ocrBusy = false;
-
-  function ocrFromSource(src, w, h, setStatus){
-    if (ocrBusy) return Promise.resolve();
-    ocrBusy = true;
-    return runOCR(src, w, h, setStatus).then(function(result){
-      ocrBusy = false;
-      if (!result.ok){
-        setStatus("No se reconoció ningún dato del pase en esa imagen. Repite la foto más de cerca, con el pase completo, plano y bien iluminado.");
-        return;
-      }
-      setStatus("Datos leídos. Revísalos antes de agregar.");
-      openReview(result);
-    }).catch(function(e){
-      ocrBusy = false;
-      setStatus(String(e && e.message) === "no-tesseract"
-        ? "No se pudo cargar el lector de texto (revisa la conexión)."
-        : "Falló la lectura de texto.");
-    });
+}
+function setProg(pct,label){
+  $("#progWrap").style.display = pct==null ? "none" : "block";
+  if(pct==null) return;
+  $("#progFill").style.width = Math.round(pct*100)+"%";
+  $("#progTxt").textContent = (label||"") + " " + Math.round(pct*100) + "%";
+}
+async function getWorker(){
+  if(tessWorker) return tessWorker;
+  setProg(0.05,"Cargando lector");
+  if(typeof Tesseract === "undefined"){
+    await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
   }
-
-  function ocrFromFile(file){
-    if (!file) return;
-    showToast("Leyendo el pase…");
-    createImageBitmap(file).then(function(bmp){
-      return ocrFromSource(bmp, bmp.width, bmp.height, showToast);
-    }).catch(function(){ showToast("No se pudo leer esa imagen."); });
+  var opts = { logger:function(m){ if(m.status==="recognizing text") setProg(m.progress,"Leyendo"); } };
+  try{
+    tessWorker = await Tesseract.createWorker("eng",1,opts);
+  }catch(err){
+    opts.langPath = "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0";
+    tessWorker = await Tesseract.createWorker("eng",1,opts);
   }
-
-  // Desde el escáner: toma una foto a resolución de sensor y la pasa al OCR.
-  function ocrFromCamera(){
-    if (!mediaStream) return;
-    scanStatus.textContent = "Tomando foto para leer el texto…";
-    grabBitmap().then(function(bmp){
-      return ocrFromSource(bmp, bmp.width, bmp.height, function(m){ scanStatus.textContent = m; });
-    }).catch(function(){ scanStatus.textContent = "No se pudo capturar la foto."; });
+  await tessWorker.setParameters({ tessedit_pageseg_mode:"4" });
+  return tessWorker;
+}
+async function runOCR(srcEl){
+  var cv = prepare(srcEl, $("#optBw").checked);
+  if(!cv){ msg("No hay imagen","No se pudo leer la foto. Tomala otra vez."); return; }
+  $("#ocrNote").textContent = "";
+  setProg(0.02,"Preparando");
+  try{
+    var w = await getWorker();
+    var res = await w.recognize(cv);
+    setProg(null);
+    showReview(res.data.text || "", cv.toDataURL("image/jpeg",0.6));
+  }catch(err){
+    setProg(null);
+    $("#ocrNote").textContent = "El lector automático no cargó: " + err.message;
+    msg("El lector no está disponible",
+      "<p>No se pudo cargar el motor de lectura (necesita conexión la primera vez, y algunos navegadores lo bloquean dentro de una página embebida).</p><p>Podés cargar el pasajero a mano en la pestaña <strong>2. Escribir</strong>.</p>",
+      [{t:"Ir a escribir",p:true,fn:function(){ showPane("manual"); }},{t:"Cerrar"}]);
   }
+}
 
-  var ocrInput = document.getElementById("ocrInput");
-  document.getElementById("ocrBtn").addEventListener("click", function(){ ocrInput.click(); });
-  ocrInput.addEventListener("change", function(){
-    var f = ocrInput.files && ocrInput.files[0];
-    ocrInput.value = "";
-    ocrFromFile(f);
-  });
-  document.getElementById("ocrCamBtn").addEventListener("click", ocrFromCamera);
+/* ---------- formularios ---------- */
+function buildForm(container, data, mark){
+  container.innerHTML = FIELDS.map(function(f){
+    var v = data && data[f.k] ? data[f.k] : "";
+    var cls = "field" + (mark ? (v ? " auto" : " miss") : "");
+    return '<div class="'+cls+'"><label for="'+container.id+'-'+f.k+'">'+esc(f.l)+'</label>'+
+           '<input type="text" id="'+container.id+'-'+f.k+'" data-k="'+f.k+'" value="'+esc(v)+'"></div>';
+  }).join("");
+}
+function readForm(container){
+  var o = {};
+  $$("input[data-k]",container).forEach(function(inp){ o[inp.dataset.k] = inp.value.trim().toUpperCase(); });
+  return o;
+}
 
+function showReview(rawText, thumb){
+  pending = parsePass(rawText);
+  pending._raw = rawText;
+  $("#revThumb").src = thumb;
+  $("#revRaw").textContent = rawText.trim() || "(sin texto)";
+  var got = ["name","eticket","flight","date"].filter(function(k){ return pending[k]; }).length;
+  $("#revHint").innerHTML = got===4
+    ? "Se leyeron los cuatro datos clave. Revisalos igual: la lectura de letra impresa se equivoca a menudo con 0/O, 1/I, 5/S y 8/B."
+    : "Faltan " + (4-got) + " de los cuatro datos clave (nombre, e-ticket, vuelo, fecha). Completalos a mano antes de agregar.";
+  buildForm($("#reviewForm"), pending, true);
+  openOv("ovReview");
+}
 
-  /* =========================================================
-     7. INGRESO MANUAL
-  ==========================================================*/
-  var manualModal = document.getElementById("manualModal");
-  var manualInput = document.getElementById("manualInput");
-  document.getElementById("manualBtn").addEventListener("click", function(){
-    manualInput.value = ""; manualModal.hidden = false;
-  });
-  document.getElementById("manualCancel").addEventListener("click", function(){
-    manualModal.hidden = true;
-  });
-  document.getElementById("manualSubmit").addEventListener("click", function(){
-    var raw = manualInput.value.trim();
-    if (!raw) return;
-    var res = addPassengerFromRaw(raw);
-    manualModal.hidden = true;
-    if (res.status === "added") showToast("Agregado: "+toTitle(res.passenger.nombreCompleto));
-    else if (res.status === "duplicate") showToast("Ese pasajero ya estaba en la lista");
-    else showToast("No se reconoció como un pase de abordar IATA (BCBP)");
-  });
-
-  /* =========================================================
-     8. VACIAR LISTA
-  ==========================================================*/
-  document.getElementById("clearBtn").addEventListener("click", function(){
-    if (!state.passengers.length) return;
-    if (confirm("¿Vaciar toda la lista de "+state.passengers.length+" pasajero(s)? Esta acción no se puede deshacer.")){
-      state.passengers = [];
-      saveState(); render();
-      showToast("Lista vaciada");
-    }
-  });
-
-  /* =========================================================
-     9. EXPORTAR CSV
-  ==========================================================*/
-  function buildCSV(){
-    var header = ["Nombre completo","Apellidos","Nombres","Documento","PNR","Origen","Destino","Aerolinea","Vuelo","Clase","Asiento","Numero de tiquete","Fuente","Hora de escaneo"];
-    var esc = function(v){
-      v = (v==null?"":String(v));
-      return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
-    };
-    var lines = [header.map(esc).join(",")];
-    state.passengers.forEach(function(p){
-      lines.push([
-        p.nombreCompleto,p.apellidos,p.nombres,p.documento||"",p.pnr,p.origen,p.destino,
-        p.aerolinea,p.vuelo,CLASSES[p.clase]||p.clase,p.asiento,p.ticketNumber||"",
-        p.source||"codigo",p.scannedAt||""
-      ].map(esc).join(","));
-    });
-    return lines.join("\r\n");
+/* ---------- listado ---------- */
+function keyOf(p){
+  if(p.eticket) return "T:"+p.eticket;
+  return "N:"+(p.name||"")+"|"+(p.flight||"")+"|"+(p.date||"");
+}
+function addPax(p){
+  if(!p.name && !p.eticket){
+    msg("Falta identificar al pasajero","Escribí al menos el nombre o el número de e-ticket.");
+    return false;
   }
-
-  document.getElementById("exportBtn").addEventListener("click", function(){
-    if (!state.passengers.length){ showToast("La lista está vacía"); return; }
-    var csv = buildCSV();
-    var filename = "manifiesto_"+(state.flight ? state.flight.replace(/[^a-z0-9]+/gi,"_") : "vuelo")+".csv";
-
-    (async function(){
-      try{
-        var downloads = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null;
-        if (downloads){
-          await downloads.save({ filename: filename, data: csv });
-          showToast("Archivo guardado");
-          return;
-        }
-      }catch(e){ /* seguimos al respaldo por portapapeles */ }
-
-      try{
-        await navigator.clipboard.writeText(csv);
-        showToast("Descarga no disponible aquí: CSV copiado al portapapeles");
-      }catch(e){
-        window.prompt("Copia el contenido CSV manualmente:", csv);
-      }
-    })();
+  var k = keyOf(p);
+  var dupe = state.pax.filter(function(x){ return keyOf(x)===k; })[0];
+  if(dupe){
+    state.dup++; save(); render();
+    msg("Ya está en el listado",
+      "<p><strong>"+esc(dupe.name||"(sin nombre)")+"</strong><br>E-ticket "+esc(dupe.eticket||"—")+
+      " · Vuelo "+esc(dupe.flight||"—")+" · "+esc(dupe.date||"—")+"</p>"+
+      "<p class='muted'>Se registró a las "+esc(dupe.addedAt)+". No se agregó de nuevo.</p>");
+    return false;
+  }
+  p.id = Date.now()+"-"+Math.random().toString(36).slice(2,7);
+  p.addedAt = new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+  state.pax.push(p); save(); render();
+  return true;
+}
+function fmtRoute(p){
+  var f = p.from ? (IATA[p.from]||p.from) : "";
+  var t = p.to ? (IATA[p.to]||p.to) : "";
+  return (f||t) ? (f+" → "+t) : "—";
+}
+function filtered(){
+  var q = $("#q").value.trim().toUpperCase();
+  var fl = $("#fFlight").value;
+  return state.pax.filter(function(p){
+    if(fl && p.flight!==fl) return false;
+    if(!q) return true;
+    return [p.name,p.eticket,p.seat,p.doc,p.flight].join(" ").toUpperCase().indexOf(q)>=0;
   });
+}
+function render(){
+  var pcs = 0, kg = 0;
+  state.pax.forEach(function(p){ pcs += parseInt(p.bagPcs||0,10)||0; kg += parseInt(p.bagKg||0,10)||0; });
+  $("#sbPax").textContent = "Pasajeros: " + state.pax.length;
+  $("#sbDup").textContent = "Repetidos bloqueados: " + state.dup;
+  $("#sbBag").textContent = "Equipaje: " + pcs + " pzs / " + kg + " kg";
 
-  /* =========================================================
-     10. INICIO
-  ==========================================================*/
-  loadState();
-  render();
+  var flights = [];
+  state.pax.forEach(function(p){ if(p.flight && flights.indexOf(p.flight)<0) flights.push(p.flight); });
+  var sel = $("#fFlight"), cur = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + flights.map(function(f){
+    return '<option value="'+esc(f)+'">'+esc(f)+'</option>'; }).join("");
+  if(flights.indexOf(cur)>=0) sel.value = cur;
+
+  var rows = filtered();
+  var box = $("#listBox");
+  if(!state.pax.length){
+    box.innerHTML = '<div class="empty"><p><strong>El listado está vacío.</strong></p>'+
+      '<p class="muted">Escaneá el primer pase en la pestaña 1.</p></div>';
+    return;
+  }
+  if(!rows.length){
+    box.innerHTML = '<div class="empty"><p><strong>Ningún pasajero coincide con la búsqueda.</strong></p></div>';
+    return;
+  }
+  box.innerHTML = '<div class="tablewrap"><table><thead><tr>'+
+    '<th>#</th><th>Pasajero</th><th>E-ticket</th><th>Vuelo</th><th>Fecha</th><th>Asiento</th>'+
+    '<th>Documento</th><th>Ruta</th><th>Equipaje</th><th>Registro</th><th class="no-print"></th>'+
+    '</tr></thead><tbody>' +
+    rows.map(function(p,n){
+      var bag = (p.bagPcs||p.bagKg) ? ((p.bagPcs||"0")+" pz / "+(p.bagKg||"0")+" kg") : "—";
+      return '<tr><td class="num">'+(n+1)+'</td>'+
+        '<td>'+esc(p.name||"—")+'</td>'+
+        '<td class="num">'+esc(p.eticket||"—")+'</td>'+
+        '<td>'+esc(p.flight||"—")+'</td>'+
+        '<td>'+esc(p.date||"—")+'</td>'+
+        '<td>'+esc(p.seat||"—")+'</td>'+
+        '<td>'+esc(p.doc||"—")+'</td>'+
+        '<td>'+esc(fmtRoute(p))+'</td>'+
+        '<td>'+esc(bag)+'</td>'+
+        '<td class="num">'+esc(p.addedAt||"")+'</td>'+
+        '<td class="no-print"><button class="mini" data-del="'+p.id+'">Quitar</button></td></tr>';
+    }).join("") + '</tbody></table></div>';
+}
+
+/* ---------- exportar ---------- */
+function csv(){
+  if(!state.pax.length){ msg("Nada que exportar","Agregá al menos un pasajero al listado."); return; }
+  var head = ["N","Pasajero","Documento","E-ticket","Vuelo","Fecha","Hora","Clase","Asiento","Origen","Destino","Piezas","Kilos","Registro"];
+  var q = function(v){ return '"' + String(v==null?"":v).replace(/"/g,'""') + '"'; };
+  var body = state.pax.map(function(p,i){
+    return [i+1,p.name,p.doc,p.eticket,p.flight,p.date,p.time,p.cls,p.seat,p.from,p.to,p.bagPcs,p.bagKg,p.addedAt].map(q).join(";");
+  });
+  var text = "\ufeff" + head.map(q).join(";") + "\n" + body.join("\n");
+  var name = "abordaje_" + (state.pax[0].flight||"vuelo") + "_" + (state.pax[0].date||"") + ".csv";
+  try{
+    var url = URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
+    var a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }catch(e){
+    msg("No se pudo descargar","<p>El navegador bloqueó la descarga. Copiá el contenido a mano:</p>"+
+      "<pre style='max-height:220px'>"+esc(text)+"</pre>");
+  }
+}
+
+/* ---------- camara ---------- */
+var stream = null;
+async function startCam(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920}}});
+    var v = $("#cam");
+    v.srcObject = stream; await v.play();
+    v.style.display = "block"; $("#shot").style.display="none";
+    $("#stagePh").style.display = "none"; $("#guide").style.display = "block";
+    $("#btnShoot").disabled = false; $("#btnCam").textContent = "Apagar cámara";
+  }catch(err){
+    msg("La cámara no se pudo abrir",
+      "<p>"+esc(err.name==="NotAllowedError" ? "No diste permiso de cámara, o la página está dentro de un marco que lo bloquea." : err.message)+"</p>"+
+      "<p>Usá el botón <strong>Tomar foto con la cámara</strong>: abre la cámara del celular y funciona igual.</p>");
+  }
+}
+function stopCam(){
+  if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream=null; }
+  $("#cam").style.display="none"; $("#guide").style.display="none";
+  $("#btnShoot").disabled = true; $("#btnCam").textContent = "Cámara en vivo";
+  if(!$("#shot").src) $("#stagePh").style.display = "block";
+}
+
+/* ---------- navegacion ---------- */
+function showPane(name){
+  $$(".tab").forEach(function(t){ t.setAttribute("aria-selected", String(t.dataset.pane===name)); });
+  $$(".pane").forEach(function(p){ p.classList.toggle("on", p.id==="pane-"+name); });
+  if(name!=="scan") stopCam();
+}
+
+/* ---------- eventos ---------- */
+$$(".tab").forEach(function(t){ t.onclick = function(){ showPane(t.dataset.pane); }; });
+
+$("#btnFile").onclick = function(){ $("#fileIn").click(); };
+$("#fileIn").onchange = function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  stopCam();
+  var img = $("#shot");
+  img.onload = function(){ URL.revokeObjectURL(img.src0); runOCR(img); };
+  var url = URL.createObjectURL(f);
+  img.src0 = url; img.src = url;
+  img.style.display="block"; $("#stagePh").style.display="none";
+  e.target.value = "";
+};
+$("#btnCam").onclick = function(){ stream ? stopCam() : startCam(); };
+$("#btnShoot").onclick = function(){
+  var v = $("#cam");
+  var cv = prepare(v,false);
+  if(!cv) return;
+  var img = $("#shot");
+  img.src = cv.toDataURL("image/jpeg",0.9);
+  img.style.display="block";
+  stopCam();
+  img.onload = function(){ runOCR(img); };
+};
+
+$("#btnConfirmAdd").onclick = function(){
+  var p = readForm($("#reviewForm"));
+  p.raw = pending && pending._raw ? pending._raw.slice(0,900) : "";
+  if(addPax(p)){ closeOv("ovReview"); showPane("list"); }
+};
+
+buildForm($("#manualForm"), {}, false);
+$("#btnManualAdd").onclick = function(){
+  var p = readForm($("#manualForm"));
+  if(addPax(p)){ buildForm($("#manualForm"),{},false); showPane("list"); }
+};
+$("#btnManualClear").onclick = function(){ buildForm($("#manualForm"),{},false); };
+
+$("#q").oninput = render;
+$("#fFlight").onchange = render;
+
+$("#listBox").addEventListener("click", function(e){
+  var b = e.target.closest("[data-del]");
+  if(!b) return;
+  var id = b.getAttribute("data-del");
+  var p = state.pax.filter(function(x){ return x.id===id; })[0];
+  msg("Quitar del listado",
+    "<p>¿Sacar a <strong>"+esc(p && p.name ? p.name : "este pasajero")+"</strong> del listado de abordaje?</p>",
+    [{t:"Cancelar"},{t:"Quitar",p:true,fn:function(){
+      state.pax = state.pax.filter(function(x){ return x.id!==id; }); save(); render();
+    }}]);
+});
+
+document.addEventListener("click", function(e){
+  var b = e.target.closest("[data-act]");
+  if(!b) return;
+  var a = b.getAttribute("data-act");
+  if(a==="csv") csv();
+  if(a==="print"){ showPane("list"); setTimeout(function(){ window.print(); }, 120); }
+  if(a==="wipe"){
+    msg("Borrar todo",
+      "<p>Se elimina el listado completo ("+state.pax.length+" pasajeros) de este navegador. No se puede deshacer.</p>",
+      [{t:"Cancelar"},{t:"Borrar todo",p:true,fn:function(){
+        state.pax=[]; state.dup=0; save(); render();
+      }}]);
+  }
+  if(a==="about"){
+    msg("Acerca de ABORDAJE.EXE",
+      "<p>Lector de tarjetas de embarque para el mostrador. Lee el <strong>texto impreso</strong> del pase con la cámara; no lee el código PDF417, que en este formato queda demasiado pequeño para el lente de un celular.</p>"+
+      "<p>Todo corre en el celular. El listado se guarda solo en este navegador: si borrás los datos del sitio, se pierde. Exportá el CSV al cerrar el vuelo.</p>"+
+      "<p class='muted'>Motor de lectura: Tesseract.js, cargado desde internet la primera vez.</p>");
+  }
+});
+
+$("#themeBtn").onclick = function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  var next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+};
+
+load(); render();
 })();
 </script>
 </body>
