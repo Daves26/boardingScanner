@@ -393,7 +393,7 @@ var MON = {ENE:"ENE",JAN:"ENE",FEB:"FEB",MAR:"MAR",ABR:"ABR",APR:"ABR",MAY:"MAY"
            JUL:"JUL",AGO:"AGO",AUG:"AGO",SEP:"SEP",SET:"SEP",OCT:"OCT",NOV:"NOV",DIC:"DIC",DEC:"DIC"};
 var MONRE = /\b(\d{1,2})\s*(ENE|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|SET|OCT|NOV|DIC|DEC)\b/;
 var NOISE = /NIT|CALL\s*CENTER|LINEA|GRATUITA|WEB|SITE|WWW|AV\.|CALLE|BOGOTA|COLOMBIA|ENTRADA|INTERIOR/;
-var LABELS = /EQUIPAJE|BAGGAGE|TARJETA|EMBARQUE|BOARDING|PASS|FREQUENT|FLYER|CONTROL|AGENTE|TICKET|VUELO|FLIGHT|SEAT|ASIENTO|GATE|PUERTA|DOCUMENTO|IDENTIFICAC|PASAJERO|NOMBRE|NAME|CLASE|CLASS|FECHA|DATE|HORA|TIME|SATENA/;
+var LABELS = /EQUIPAJE|BAGGAGE|TARJETA|EMBARQUE|BOARDING|PASS|FREQUENT|FLYER|CONTROL|AGENTE|TICKET|VUELO|FLIGHT|SEAT|ASIENTO|GATE|PUERTA|DOCUMENTO|IDENTIFICAC|PASAJERO|NOMBRE|NAME|CLASE|CLASS|FECHA|DATE|HORA|TIME|SATENA|FROM/;
 
 function toDigits(s){
   return String(s).replace(/[OQD]/g,"0").replace(/[IL|]/g,"1").replace(/S/g,"5")
@@ -403,6 +403,9 @@ function toDigits(s){
 /* nombre: APELLIDO/NOMBRE, sin espacio antes de la barra, sin digitos */
 function nameLineOk(l){
   if(NOISE.test(l) || LABELS.test(l) || l.indexOf("/")<0) return null;
+  /* protege contra el rotulo fijo "DE(FROM)/A(TO)" leido sin los parentesis */
+  var onlyLetters = l.replace(/[^A-ZÑ]/g,"");
+  if(onlyLetters==="DEFROMATO" || onlyLetters.indexOf("FROM")>=0) return null;
   if((l.match(/\d/g)||[]).length > 2) return null;
   var f = l.replace(/0/g,"O").replace(/1/g,"I").replace(/5/g,"S")
            .replace(/8/g,"B").replace(/6/g,"G").replace(/2/g,"Z");
