@@ -335,7 +335,38 @@ function detectDocument(src){
 
     cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
-    cv.Canny(blur,50,150,3,false);
+
+    /*
+     * OpenCV.js expone distintas sobrecargas de Canny según la versión
+     * del build WASM. En algunos builds, pasar directamente los umbrales
+     * como argumentos de la sobrecarga corta produce:
+     * "Cannot pass \"50\" as a Mat".
+     *
+     * Usamos la forma explícita con los parámetros completos y números
+     * convertidos a Number para evitar que embind seleccione la
+     * sobrecarga dx/dy.
+     */
+    try {
+      cv.Canny(blur,edges,Number(50),Number(150),3,false);
+    } catch (cannyError) {
+      console.warn("Canny estándar falló; usando Sobel + threshold.", cannyError);
+
+      const gx=new cv.Mat();
+      const gy=new cv.Mat();
+      const mag=new cv.Mat();
+
+      cv.Sobel(blur,gx,cv.CV_16S,1,0,3,1,0,cv.BORDER_DEFAULT);
+      cv.Sobel(blur,gy,cv.CV_16S,0,1,3,1,0,cv.BORDER_DEFAULT);
+      cv.convertScaleAbs(gx,gx);
+      cv.convertScaleAbs(gy,gy);
+      cv.addWeighted(gx,0.5,gy,0.5,0,mag);
+      cv.threshold(mag,edges,50,255,cv.THRESH_BINARY);
+
+      gx.delete();
+      gy.delete();
+      mag.delete();
+    }
+
     cv.findContours(edges,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
 
     let best=null, bestArea=0;
