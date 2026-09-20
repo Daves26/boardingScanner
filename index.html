@@ -322,9 +322,9 @@ async function initOCR(){
     });
 
     await worker.setParameters({
-      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
       preserve_interword_spaces: "1",
-      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ/+ "
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/+ "
     });
 
     ocrReady=true;
@@ -503,13 +503,13 @@ function warpDocument(src,pts){
  * NOMBRE DEL PASAJERO / PASSENGER NAME
  *
  * Basado en el formato mostrado por el usuario:
- * x ≈ 8%-92%, y ≈ 34%-66% del documento.
+ * x ≈ 8%-92%, y ≈ 38%-53% del documento (zona del nombre).
  */
 function extractNameBand(warp){
   const x=Math.round(warp.cols*0.08);
-  const y=Math.round(warp.rows*0.34);
+  const y=Math.round(warp.rows*0.38);
   const w=Math.round(warp.cols*0.84);
-  const h=Math.round(warp.rows*0.32);
+  const h=Math.round(warp.rows*0.15);
   return warp.roi(new cv.Rect(x,y,w,h));
 }
 
@@ -565,40 +565,59 @@ function extractName(text){
   text=text.replace(/\s*\/\s*/g,"/");
   text=text.replace(/\s*\+\s*$/,"+");
 
+  // Reparar: el "/" confundido con "1" o "I" por el OCR.
+  // Ej: MOFFETT1NICKOLAUS → MOFFETT/NICKOLAUS
+  if (!/\//.test(text)) {
+    const repaired=text.replace(/([A-Z])1([A-Z])/g,'$1/$2');
+    if (repaired!==text) text=repaired;
+  }
+
   /*
-   * La versión anterior tenía un problema importante:
-   * el \b después de un "+" nunca coincide correctamente porque "+"
-   * no es un carácter de palabra. Por eso nombres como:
-   *
-   *   MURCIA/DIANA MAR+
-   *
-   * eran rechazados aunque Tesseract los leyera correctamente.
-   *
-   * Separamos el "+" opcional del nombre para validarlo correctamente.
+   * Buscar TODOS los candidatos APELLIDO/NOMBRE en el texto
+   * en vez de aceptar/rechazar el primero que encuentre.
+   * Se elige el mejor candidato: más largo, sin dígitos en apellido,
+   * que no sea una etiqueta de ruta.
    */
-  const match=text.match(
-    /\b([A-Z]+(?: [A-Z]+)*)\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3})(\+)?(?:\b|$)/
-  );
+  const regex=/\b([A-Z]+(?: [A-Z]+)*)\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3})(\+)?(?:\b|$)/g;
+  let bestMatch=null;
+  let bestScore=0;
+  let m;
+  while((m=regex.exec(text))!==null){
+    const surname=m[1];
+    const given=m[2].trim();
+    const suffix=m[3] || "";
+    const fullName=surname+"/"+given+suffix;
+    const words=[surname,...given.replace("+","").split(" ")];
 
-  if(!match) return null;
+    // Rechazar si alguna palabra está en la blacklist.
+    if(words.some(w=>BLACKLIST.has(w))) continue;
+    if(surname.length<2 || given.length<2) continue;
+    if(/^(FROM|TO|DE|A|PARA|DESDE)\//.test(fullName)) continue;
 
-  const surname=match[1];
-  const given=match[2].trim();
-  const suffix=match[3] || "";
+    // Puntuar: más caracteres = mejor candidato.
+    const score=fullName.length;
+    if(score>bestScore){
+      bestScore=score;
+      bestMatch={surname,given,suffix,fullName};
+    }
+  }
 
-  // Conservamos el "+" porque forma parte del formato del pasajero.
-  const fullName=surname+"/"+given+suffix;
+  if(!bestMatch) return null;
+  return bestMatch.fullName;
+}
 
-  const words=[surname,...given.replace("+","").split(" ")];
-
-  if(words.some(w=>BLACKLIST.has(w))) return null;
-  if(surname.length<2 || given.length<2) return null;
-
-  // Evita textos claramente de ruta/etiqueta.
-  if(/^(FROM|TO|DE|A|PARA|DESDE)\//.test(text)) return null;
-  if(/BOARDING|PASSENGER|NOMBRE|PASAJERO/.test(text)) return null;
-
-  return fullName;
+/*
+ * Compara dos nombres por similitud del apellido.
+ * Acepta variaciones menores por tipeo OCR imperfecto.
+ */
+function namesSimilar(a, b){
+  const sa=a.split('/')[0].trim();
+  const sb=b.split('/')[0].trim();
+  if(sa===sb) return true;
+  if(sa.length>=3 && sb.length>=3){
+    if(sa.includes(sb) || sb.includes(sa)) return true;
+  }
+  return false;
 }
 
 function pretty(name){
@@ -716,15 +735,28 @@ async function processFrame(){
     } else {
       // Fallback: ROI directa si no se detecta contorno.
       const fx=Math.round(vw*0.08);
-      const fy=Math.round(vh*0.34);
+      const fy=Math.round(vh*0.38);
       const fw=Math.round(vw*0.84);
-      const fh=Math.round(vh*0.32);
+      const fh=Math.round(vh*0.15);
       band=src.roi(new cv.Rect(fx,fy,fw,fh));
       documentBox.style.display="none";
       roiBox.style.display="block";
     }
 
     prep=preprocessForOCR(band);
+
+    // Performance: si la banda es muy ancha, reducirla antes de OCR
+    // para no saturar al celular. Máx ~1600px de ancho.
+    const MAX_OCR_WIDTH=1600;
+    if(prep.bw.cols>MAX_OCR_WIDTH){
+      const scale=MAX_OCR_WIDTH/prep.bw.cols;
+      const newW=Math.round(prep.bw.cols*scale);
+      const newH=Math.round(prep.bw.rows*scale);
+      const resized=new cv.Mat();
+      cv.resize(prep.bw,resized,new cv.Size(newW,newH),0,0,cv.INTER_NEAREST);
+      prep.bw.delete();
+      prep.bw=resized;
+    }
 
     cv.imshow(ocrCanvas,prep.bw);
 
@@ -748,7 +780,7 @@ async function processFrame(){
     );
 
     if(name){
-      if(name===stableCandidate){
+      if(namesSimilar(name, stableCandidate)){
         stableHits++;
       }else{
         stableCandidate=name;
