@@ -521,6 +521,9 @@ function preprocessForOCR(mat){
   cv.cvtColor(mat,gray,cv.COLOR_RGBA2GRAY);
   cv.resize(gray,enlarged,new cv.Size(0,0),2.2,2.2,cv.INTER_CUBIC);
 
+  // Equalización de histograma para mejorar contraste en pases con poca diferenciación.
+  cv.equalizeHist(enlarged, enlarged);
+
   // Normalización de contraste + binarización por Otsu.
   cv.GaussianBlur(enlarged,enlarged,new cv.Size(3,3),0);
   cv.threshold(enlarged,bw,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
