@@ -582,11 +582,26 @@ function showDocumentBox(pts, vw, vh){
     return;
   }
 
-  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
-  const x=Math.min(...xs)/vw*100;
-  const y=Math.min(...ys)/vh*100;
-  const w=(Math.max(...xs)-Math.min(...xs))/vw*100;
-  const h=(Math.max(...ys)-Math.min(...ys))/vh*100;
+  // detectDocument() puede devolver un objeto ordenado
+  // {tl,tr,br,bl}, no necesariamente un Array.
+  const list = Array.isArray(pts)
+    ? pts
+    : [pts.tl, pts.tr, pts.br, pts.bl];
+
+  if(list.length !== 4 || list.some(p => !p || !Number.isFinite(p.x) || !Number.isFinite(p.y))){
+    documentBox.style.display="none";
+    return;
+  }
+
+  const xs=list.map(p=>p.x);
+  const ys=list.map(p=>p.y);
+
+  const x=Math.max(0,Math.min(...xs))/vw*100;
+  const y=Math.max(0,Math.min(...ys))/vh*100;
+  const right=Math.min(vw,Math.max(...xs));
+  const bottom=Math.min(vh,Math.max(...ys));
+  const w=Math.max(0,right-Math.min(...xs))/vw*100;
+  const h=Math.max(0,bottom-Math.min(...ys))/vh*100;
 
   documentBox.style.left=x+"%";
   documentBox.style.top=y+"%";
