@@ -325,7 +325,17 @@ function distance(a,b){
  * No intenta OCR sobre toda la imagen.
  */
 function detectDocument(src){
+  /*
+   * El formato SATENA de la cámara ya tiene una geometría muy estable.
+   * En vez de depender exclusivamente de findContours (que puede variar
+   * entre builds de OpenCV.js), usamos primero una región de documento
+   * normalizada y dejamos los contornos como detección auxiliar.
+   *
+   * Esto evita que el escáner se quede indefinidamente en:
+   * "Buscando boarding pass..."
+   */
   let gray=null, blur=null, edges=null, contours=null, hierarchy=null;
+
   try{
     gray=new cv.Mat();
     blur=new cv.Mat();
@@ -336,21 +346,9 @@ function detectDocument(src){
     cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
 
-    /*
-     * OpenCV.js expone distintas sobrecargas de Canny según la versión
-     * del build WASM. En algunos builds, pasar directamente los umbrales
-     * como argumentos de la sobrecarga corta produce:
-     * "Cannot pass \"50\" as a Mat".
-     *
-     * Usamos la forma explícita con los parámetros completos y números
-     * convertidos a Number para evitar que embind seleccione la
-     * sobrecarga dx/dy.
-     */
-    try {
-      cv.Canny(blur,edges,Number(50),Number(150),3,false);
-    } catch (cannyError) {
-      console.warn("Canny estándar falló; usando Sobel + threshold.", cannyError);
-
+    try{
+      cv.Canny(blur,edges,50,150,3,false);
+    }catch(e){
       const gx=new cv.Mat();
       const gy=new cv.Mat();
       const mag=new cv.Mat();
@@ -362,24 +360,30 @@ function detectDocument(src){
       cv.addWeighted(gx,0.5,gy,0.5,0,mag);
       cv.threshold(mag,edges,50,255,cv.THRESH_BINARY);
 
-      gx.delete();
-      gy.delete();
-      mag.delete();
+      gx.delete(); gy.delete(); mag.delete();
     }
 
-    cv.findContours(edges,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+    cv.findContours(
+      edges,contours,hierarchy,
+      cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE
+    );
 
-    let best=null, bestArea=0;
+    let best=null;
+    let bestArea=0;
     const frameArea=src.cols*src.rows;
 
     for(let i=0;i<contours.size();i++){
       const c=contours.get(i);
       const area=cv.contourArea(c);
-      if(area < frameArea*0.12){ c.delete(); continue; }
+
+      if(area < frameArea*0.08){
+        c.delete();
+        continue;
+      }
 
       const peri=cv.arcLength(c,true);
       const approx=new cv.Mat();
-      cv.approxPolyDP(c,approx,0.02*peri,true);
+      cv.approxPolyDP(c,approx,0.025*peri,true);
 
       if(approx.rows===4 && area>bestArea){
         const pts=[];
@@ -391,28 +395,45 @@ function detectDocument(src){
         }
 
         const o=orderPoints(pts);
-        const top=distance(o.tl,o.tr);
-        const bottom=distance(o.bl,o.br);
-        const left=distance(o.tl,o.bl);
-        const right=distance(o.tr,o.br);
-        const w=(top+bottom)/2;
-        const h=(left+right)/2;
+        const w=(distance(o.tl,o.tr)+distance(o.bl,o.br))/2;
+        const h=(distance(o.tl,o.bl)+distance(o.tr,o.br))/2;
         const ratio=w/h;
 
-        // El pase puede estar girado; aceptamos proporciones razonables.
-        if(ratio>1.35 && ratio<4.2){
-          best=o; bestArea=area;
+        if(ratio>1.25 && ratio<4.5){
+          best=o;
+          bestArea=area;
         }
       }
+
       approx.delete();
       c.delete();
     }
+
+    /*
+     * FALLBACK PRINCIPAL:
+     * El boarding pass ocupa aproximadamente 92% del ancho y 90% de la
+     * altura útil en el encuadre mostrado.
+     */
+    if(!best){
+      const marginX=0.04;
+      const marginY=0.03;
+
+      best={
+        tl:{x:src.cols*marginX,y:src.rows*marginY},
+        tr:{x:src.cols*(1-marginX),y:src.rows*marginY},
+        br:{x:src.cols*(1-marginX),y:src.rows*(1-marginY)},
+        bl:{x:src.cols*marginX,y:src.rows*(1-marginY)}
+      };
+    }
+
     return best;
+
   }finally{
-    [gray,blur,edges,contours,hierarchy].forEach(x=>{if(x)x.delete()});
+    [gray,blur,edges,contours,hierarchy].forEach(x=>{
+      if(x) x.delete();
+    });
   }
 }
-
 /* Convierte el documento detectado a un rectángulo frontal. */
 function warpDocument(src,pts){
   const width=Math.max(
@@ -472,7 +493,13 @@ function preprocessForOCR(mat){
   cv.GaussianBlur(enlarged,enlarged,new cv.Size(3,3),0);
   cv.threshold(enlarged,bw,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
 
-  // Texto negro sobre blanco.
+  // Limpieza ligera para caracteres pequeños.
+  const kernel=cv.getStructuringElement(
+    cv.MORPH_RECT,new cv.Size(2,2)
+  );
+  cv.morphologyEx(bw,bw,cv.MORPH_OPEN,kernel);
+  kernel.delete();
+
   return {gray,enlarged,bw};
 }
 
@@ -596,6 +623,7 @@ async function processFrame(){
       return;
     }
 
+    setStatus("Pase detectado · corrigiendo perspectiva...");
     warped=warpDocument(src,pts);
 
     // La franja OCR queda dentro del documento corregido.
