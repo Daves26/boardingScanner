@@ -521,16 +521,9 @@ function preprocessForOCR(mat){
   cv.cvtColor(mat,gray,cv.COLOR_RGBA2GRAY);
   cv.resize(gray,enlarged,new cv.Size(0,0),2.2,2.2,cv.INTER_CUBIC);
 
-  // Normalización de contraste + binarización adaptativa.
+  // Normalización de contraste + binarización por Otsu.
   cv.GaussianBlur(enlarged,enlarged,new cv.Size(3,3),0);
-
-  // Equalización de histograma global (cv.createCLAHE no existe en OpenCV.js).
-  cv.equalizeHist(enlarged, enlarged);
-
-  // Umbralización adaptativa gaussiana en vez de Otsu global:
-  // maneja mejor contraste desigual (papel brillante, flash, sombras).
-  cv.adaptiveThreshold(enlarged,bw,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-    cv.THRESH_BINARY,31,10);
+  cv.threshold(enlarged,bw,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
 
   // Cerrar trazos rotos (MORPH_CLOSE) en vez de abrir (MORPH_OPEN)
   // que borra letras pequeñas.
