@@ -690,47 +690,39 @@ async function processFrame(){
     const vh=video.videoHeight;
     if(!vw || !vh) return;
 
-    /*
-     * IMPORTANTE:
-     * No hacemos depender el OCR de la detección del contorno del pase.
-     *
-     * En la versión anterior el ciclo era:
-     *   detectar documento -> perspectiva -> OCR
-     *
-     * Si el contorno cambiaba ligeramente entre fotogramas, el escáner
-     * volvía a empezar continuamente y nunca llegaba a estabilizar el OCR.
-     *
-     * Para este formato SATENA usamos directamente la ROI visible:
-     * la misma zona que muestra el recuadro "NOMBRE DEL PASAJERO".
-     *
-     * Esto permite que el usuario simplemente centre el nombre y lo mantenga
-     * enfocado. OpenCV se utiliza para el preprocesamiento, no como requisito
-     * previo para poder ejecutar el OCR.
-     */
-
     canvas.width=vw;
     canvas.height=vh;
     ctx.drawImage(video,0,0,vw,vh);
 
-    // ROI de cámara: corresponde al recuadro mostrado en pantalla.
-    const x=Math.round(vw*0.08);
-    const y=Math.round(vh*0.34);
-    const w=Math.round(vw*0.84);
-    const h=Math.round(vh*0.32);
-
-    // Mostrar visualmente la ROI activa.
-    roiBox.style.left="8%";
-    roiBox.style.top="34%";
-    roiBox.style.width="84%";
-    roiBox.style.height="32%";
-
-    // Ya no necesitamos que documentBox controle el flujo.
-    documentBox.style.display="none";
-
     src=cv.imread(canvas);
 
-    // Recorte directo de la franja del nombre.
-    band=src.roi(new cv.Rect(x,y,w,h));
+    /*
+      * Detección del documento + warp a vista frontal.
+      * El OCR trabaja sobre la imagen enderezada, no sobre la
+      * tira distorsionada de la cámara.
+      */
+
+    documentBox.style.display="block";
+    roiBox.style.display="none";
+
+    const pts = detectDocument(src);
+
+    if(pts){
+      warped = warpDocument(src, pts);
+      showDocumentBox(pts, vw, vh);
+
+      // Extraer franja del nombre del warped (vista frontal, nítida).
+      band = extractNameBand(warped);
+    } else {
+      // Fallback: ROI directa si no se detecta contorno.
+      const fx=Math.round(vw*0.08);
+      const fy=Math.round(vh*0.34);
+      const fw=Math.round(vw*0.84);
+      const fh=Math.round(vh*0.32);
+      band=src.roi(new cv.Rect(fx,fy,fw,fh));
+      documentBox.style.display="none";
+      roiBox.style.display="block";
+    }
 
     prep=preprocessForOCR(band);
 
