@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Rutas y Rumbos - Listado de Abordaje SATENA</title>
+<title>SATENA - Listado de Abordaje</title>
 
 <!-- Dependencias externas: el archivo sigue siendo un único index.html,
      pero necesita Internet para descargar OpenCV/Tesseract. -->
@@ -129,6 +129,23 @@ video{width:100%;height:100%;object-fit:cover}
   font-weight:bold;
   min-height:42px;
 }
+.debug{
+  margin-top:8px;
+  background:#fffde8;
+  border:3px solid #000;
+  padding:8px;
+  font-family:Consolas,"Courier New",monospace;
+  font-size:12px;
+  line-height:1.55;
+  word-break:break-word;
+}
+.debugTitle{
+  background:#000;
+  color:#fff;
+  padding:3px 5px;
+  margin:-8px -8px 6px -8px;
+  font-weight:bold;
+}
 table{width:100%;border-collapse:collapse;background:#fff}
 th,td{border:2px solid #000;padding:6px;font-size:14px}
 th{background:#cfcfcf}
@@ -147,7 +164,7 @@ th{background:#cfcfcf}
 
 <body>
 <div class="window">
-  <div class="titlebar">▣ RUTAS Y RUMBOS :: LISTADO DE ABORDAJE SATENA</div>
+  <div class="titlebar">▣ SATENA :: LISTADO DE ABORDAJE</div>
 
   <div class="section">
     <div class="camera">
@@ -188,6 +205,15 @@ th{background:#cfcfcf}
     <div class="status" id="status">
       Inicializando OpenCV y Tesseract...
     </div>
+
+    <div class="debug" id="debugPanel">
+      <div class="debugTitle">OCR DEBUG</div>
+      <div><b>RAW:</b> <span id="ocrRaw">---</span></div>
+      <div><b>NORMALIZADO:</b> <span id="ocrNormalized">---</span></div>
+      <div><b>CANDIDATO:</b> <span id="ocrCandidate">---</span></div>
+      <div><b>ESTABILIDAD:</b> <span id="ocrStable">0/2</span></div>
+      <div><b>CONFIANZA:</b> <span id="ocrConfidence">---</span></div>
+    </div>
   </div>
 
   <div class="section">
@@ -223,6 +249,12 @@ const last = document.getElementById("last");
 const statusBox = document.getElementById("status");
 const ocrState = document.getElementById("ocrState");
 const cvState = document.getElementById("cvState");
+
+const ocrRaw = document.getElementById("ocrRaw");
+const ocrNormalized = document.getElementById("ocrNormalized");
+const ocrCandidate = document.getElementById("ocrCandidate");
+const ocrStable = document.getElementById("ocrStable");
+const ocrConfidence = document.getElementById("ocrConfidence");
 const documentBox = document.getElementById("document");
 const roiBox = document.getElementById("roi");
 
@@ -508,6 +540,8 @@ function normalizeText(text){
     .toUpperCase()
     .replace(/[|]/g,"I")
     .replace(/[\r\n]+/g," ")
+    .replace(/\s*\/\s*/g,"/")
+    .replace(/\s*\+\s*/g,"+")
     .replace(/\s+/g," ")
     .replace(/[^A-Z0-9/+ ]/g,"")
     .trim();
@@ -527,14 +561,29 @@ function extractName(text){
   text=text.replace(/\s*\/\s*/g,"/");
   text=text.replace(/\s*\+\s*$/,"+");
 
+  /*
+   * La versión anterior tenía un problema importante:
+   * el \b después de un "+" nunca coincide correctamente porque "+"
+   * no es un carácter de palabra. Por eso nombres como:
+   *
+   *   MURCIA/DIANA MAR+
+   *
+   * eran rechazados aunque Tesseract los leyera correctamente.
+   *
+   * Separamos el "+" opcional del nombre para validarlo correctamente.
+   */
   const match=text.match(
-    /\b([A-Z]{2,25})\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3}\+?)\b/
+    /\b([A-Z]{2,25})\/([A-Z]{2,25}(?: [A-Z]{2,25}){0,3})(\+)?(?:\b|$)/
   );
 
   if(!match) return null;
 
   const surname=match[1];
   const given=match[2].trim();
+  const suffix=match[3] || "";
+
+  // Conservamos el "+" porque forma parte del formato del pasajero.
+  const fullName=surname+"/"+given+suffix;
 
   const words=[surname,...given.replace("+","").split(" ")];
 
@@ -545,7 +594,7 @@ function extractName(text){
   if(/^(FROM|TO|DE|A|PARA|DESDE)\//.test(text)) return null;
   if(/BOARDING|PASSENGER|NOMBRE|PASAJERO/.test(text)) return null;
 
-  return surname+"/"+given;
+  return fullName;
 }
 
 function pretty(name){
@@ -608,6 +657,18 @@ function showDocumentBox(pts, vw, vh){
   documentBox.style.width=w+"%";
   documentBox.style.height=h+"%";
   documentBox.style.display="block";
+}
+
+
+function updateOCRDebug(raw="", normalized="", candidate=null, stable=0, confidence=null){
+  ocrRaw.innerText = raw ? raw.replace(/\s+/g," ").trim() : "---";
+  ocrNormalized.innerText = normalized || "---";
+  ocrCandidate.innerText = candidate ? pretty(candidate) : "---";
+  ocrStable.innerText = stable+"/2";
+  ocrConfidence.innerText =
+    confidence !== null && confidence !== undefined
+      ? String(Math.round(Number(confidence)))+"%"
+      : "---";
 }
 
 async function processFrame(){
@@ -673,7 +734,22 @@ async function processFrame(){
 
     const result=await worker.recognize(ocrCanvas);
     const raw=result.data.text || "";
+    const normalized=normalizeText(raw);
     const name=extractName(raw);
+
+    // Tesseract 5 devuelve confidence en data.confidence.
+    const confidence =
+      result.data && result.data.confidence !== undefined
+        ? result.data.confidence
+        : null;
+
+    updateOCRDebug(
+      raw,
+      normalized,
+      name || stableCandidate,
+      stableHits,
+      confidence
+    );
 
     if(name){
       if(name===stableCandidate){
@@ -683,14 +759,28 @@ async function processFrame(){
         stableHits=1;
       }
 
+      updateOCRDebug(
+        raw,
+        normalized,
+        stableCandidate,
+        stableHits,
+        confidence
+      );
+
       if(stableHits>=2){
         addPassenger(name);
+        updateOCRDebug(
+          raw,
+          normalized,
+          name,
+          stableHits,
+          confidence
+        );
+
         stableHits=0;
         stableCandidate="";
         setStatus("✔ Nombre confirmado: "+pretty(name));
 
-        // Pequeña pausa para evitar volver a registrar inmediatamente
-        // el mismo pase mientras continúa frente a la cámara.
         await new Promise(r=>setTimeout(r,900));
       }else{
         setStatus(
@@ -700,8 +790,14 @@ async function processFrame(){
         );
       }
     }else{
-      // No borramos un candidato inmediatamente por una lectura vacía:
-      // Tesseract puede fallar ocasionalmente mientras la cámara enfoca.
+      updateOCRDebug(
+        raw,
+        normalized,
+        stableCandidate,
+        stableHits,
+        confidence
+      );
+
       if(stableHits>0){
         setStatus(
           "Mantenga el nombre enfocado · candidato: "+
