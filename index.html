@@ -611,40 +611,64 @@ function showDocumentBox(pts, vw, vh){
 }
 
 async function processFrame(){
-  if(busy || !running || !cvReady || !ocrReady) return;
-  if(performance.now()-lastScan<650) return;
+  if(busy || !running || !ocrReady) return;
+  if(performance.now()-lastScan<450) return;
 
   busy=true;
   lastScan=performance.now();
 
-  let src=null, warped=null, band=null, prep=null;
+  let src=null, warped=null, band=null;
+  let prep=null;
 
   try{
     const vw=video.videoWidth;
     const vh=video.videoHeight;
     if(!vw || !vh) return;
 
+    /*
+     * IMPORTANTE:
+     * No hacemos depender el OCR de la detección del contorno del pase.
+     *
+     * En la versión anterior el ciclo era:
+     *   detectar documento -> perspectiva -> OCR
+     *
+     * Si el contorno cambiaba ligeramente entre fotogramas, el escáner
+     * volvía a empezar continuamente y nunca llegaba a estabilizar el OCR.
+     *
+     * Para este formato SATENA usamos directamente la ROI visible:
+     * la misma zona que muestra el recuadro "NOMBRE DEL PASAJERO".
+     *
+     * Esto permite que el usuario simplemente centre el nombre y lo mantenga
+     * enfocado. OpenCV se utiliza para el preprocesamiento, no como requisito
+     * previo para poder ejecutar el OCR.
+     */
+
     canvas.width=vw;
     canvas.height=vh;
     ctx.drawImage(video,0,0,vw,vh);
 
+    // ROI de cámara: corresponde al recuadro mostrado en pantalla.
+    const x=Math.round(vw*0.08);
+    const y=Math.round(vh*0.38);
+    const w=Math.round(vw*0.84);
+    const h=Math.round(vh*0.22);
+
+    // Mostrar visualmente la ROI activa.
+    roiBox.style.left="8%";
+    roiBox.style.top="38%";
+    roiBox.style.width="84%";
+    roiBox.style.height="22%";
+
+    // Ya no necesitamos que documentBox controle el flujo.
+    documentBox.style.display="none";
+
     src=cv.imread(canvas);
 
-    const pts=detectDocument(src);
-    showDocumentBox(pts,vw,vh);
-
-    if(!pts){
-      setStatus("Buscando boarding pass...");
-      return;
-    }
-
-    setStatus("Pase detectado · corrigiendo perspectiva...");
-    warped=warpDocument(src,pts);
-
-    // La franja OCR queda dentro del documento corregido.
-    band=extractNameBand(warped);
+    // Recorte directo de la franja del nombre.
+    band=src.roi(new cv.Rect(x,y,w,h));
 
     prep=preprocessForOCR(band);
+
     cv.imshow(ocrCanvas,prep.bw);
 
     const result=await worker.recognize(ocrCanvas);
@@ -652,40 +676,59 @@ async function processFrame(){
     const name=extractName(raw);
 
     if(name){
-      if(name===stableCandidate) stableHits++;
-      else {
+      if(name===stableCandidate){
+        stableHits++;
+      }else{
         stableCandidate=name;
         stableHits=1;
       }
 
-      // Dos lecturas consecutivas para evitar falsos positivos.
       if(stableHits>=2){
         addPassenger(name);
         stableHits=0;
-        await new Promise(r=>setTimeout(r,500));
+        stableCandidate="";
+        setStatus("✔ Nombre confirmado: "+pretty(name));
+
+        // Pequeña pausa para evitar volver a registrar inmediatamente
+        // el mismo pase mientras continúa frente a la cámara.
+        await new Promise(r=>setTimeout(r,900));
       }else{
-        setStatus("Candidato: "+pretty(name)+" · confirmando...");
+        setStatus(
+          "Nombre detectado: "+
+          pretty(name)+
+          " · confirmando ("+stableHits+"/2)..."
+        );
       }
     }else{
-      stableCandidate="";
-      stableHits=0;
-      setStatus("Pase detectado · buscando nombre...");
+      // No borramos un candidato inmediatamente por una lectura vacía:
+      // Tesseract puede fallar ocasionalmente mientras la cámara enfoca.
+      if(stableHits>0){
+        setStatus(
+          "Mantenga el nombre enfocado · candidato: "+
+          pretty(stableCandidate)
+        );
+      }else{
+        setStatus("Buscando nombre...");
+      }
     }
 
   }catch(e){
     console.error(e);
-    setStatus("Error de procesamiento: "+e.message);
+    setStatus("Error OCR: "+e.message);
   }finally{
-    [src,warped,band].forEach(x=>{if(x)x.delete()});
+    if(src) src.delete();
+    if(warped) warped.delete();
+    if(band) band.delete();
+
     if(prep){
       prep.gray.delete();
       prep.enlarged.delete();
       prep.bw.delete();
     }
+
     busy=false;
   }
 }
-
 function loop(){
   if(!running) return;
   processFrame().finally(()=>{
@@ -774,7 +817,7 @@ document.getElementById("csv").onclick=()=>{
       waitForOpenCV(),
       initOCR()
     ]);
-    setStatus("OpenCV + OCR listos. Inicie la cámara.");
+    setStatus("OpenCV + OCR listos. Centre el nombre dentro del recuadro.");
   }catch(e){
     console.error(e);
     setStatus("Error inicializando los motores.");
