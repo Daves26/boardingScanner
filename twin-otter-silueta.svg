@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Silueta vectorial del Twin Otter DHC-6</title>
+  <desc id="desc">Vista superior estilizada de un avión bimotor de ala alta Twin Otter, con morro hacia arriba.</desc>
+  <g fill="#172B3A" stroke="#172B3A" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Cola horizontal -->
+    <path d="M279 420 L184 462 L168 449 L263 399 Z"/>
+    <path d="M321 420 L416 462 L432 449 L337 399 Z"/>
+    <!-- Fuselaje: morro arriba, cola abajo -->
+    <path d="M300 48
+      C288 60 283 82 281 111
+      L275 176 L267 244 L258 314
+      L247 382 L243 422
+      Q244 449 258 472 L281 500 L300 526
+      L319 500 L342 472 Q356 449 357 422
+      L353 382 L342 314 L333 244 L325 176
+      L319 111 C317 82 312 60 300 48 Z"/>
+    <!-- Ala alta, gran envergadura -->
+    <path d="M281 174 L58 276 L48 288 L55 301 L267 255
+      L274 291 L326 291 L333 255 L545 301 L552 288
+      L542 276 L319 174 Z"/>
+    <!-- Superficies de control del ala -->
+    <path d="M76 272 L260 190 L263 204 L82 284 Z" fill="#304B5D" stroke="none"/>
+    <path d="M524 272 L340 190 L337 204 L518 284 Z" fill="#304B5D" stroke="none"/>
+    <path d="M62 291 L265 247 M538 291 L335 247" fill="none" stroke="#91A4B1" stroke-width="2"/>
+    <!-- Góndolas de los motores -->
+    <path d="M180 225 L211 211 L238 258 L213 272 Z"/>
+    <path d="M420 225 L389 211 L362 258 L387 272 Z"/>
+    <!-- Hélices de tres palas -->
+    <g fill="#172B3A" stroke="none">
+      <path d="M201 218 Q177 196 183 187 Q193 184 211 211 Z"/>
+      <path d="M216 244 Q242 258 238 269 Q228 273 210 252 Z"/>
+      <path d="M199 252 Q187 280 177 276 Q174 266 191 246 Z"/>
+      <path d="M399 218 Q423 196 417 187 Q407 184 389 211 Z"/>
+      <path d="M384 244 Q358 258 362 269 Q372 273 390 252 Z"/>
+      <path d="M401 252 Q413 280 423 276 Q426 266 409 246 Z"/>
+    </g>
+    <!-- Cabina y parabrisas -->
+    <path d="M287 77 Q300 64 313 77 L319 111 L281 111 Z" fill="#8DB4C8" stroke="none"/>
+    <path d="M282 116 L318 116" fill="none" stroke="#91A4B1" stroke-width="2"/>
+    <!-- Ventanas -->
+    <g fill="#8DB4C8" stroke="none">
+      <rect x="287" y="135" width="9" height="13" rx="3"/>
+      <rect x="304" y="135" width="9" height="13" rx="3"/>
+      <rect x="285" y="158" width="9" height="13" rx="3"/>
+      <rect x="306" y="158" width="9" height="13" rx="3"/>
+      <rect x="282" y="181" width="9" height="13" rx="3"/>
+      <rect x="309" y="181" width="9" height="13" rx="3"/>
+      <rect x="280" y="204" width="9" height="13" rx="3"/>
+      <rect x="311" y="204" width="9" height="13" rx="3"/>
+    </g>
+    <!-- Tren de aterrizaje simplificado -->
+    <g>
+      <path d="M258 333 L245 362 M342 333 L355 362" fill="none" stroke-width="8"/>
+      <circle cx="242" cy="367" r="8"/>
+      <circle cx="358" cy="367" r="8"/>
+    </g>
+    <!-- Línea de timón y detalles de cola -->
+    <path d="M270 435 L300 451 L330 435" fill="none" stroke="#91A4B1" stroke-width="2"/>
+  </g>
+</svg>

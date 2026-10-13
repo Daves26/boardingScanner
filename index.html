@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Estamos en mantenimiento. Volveremos pronto." />
+<meta name="theme-color" content="#0b1e3a" />
+<title>Estamos en mantenimiento</title>
+<style>
+  :root{
+    --sky-top:#081c33;
+    --sky-mid:#143f6e;
+    --sky-low:#3f83c2;
+    --sky-horizon:#b9d8f2;
+    --ink:#0e2438;
+    --muted:#4a647d;
+    --card:rgba(255,255,255,.94);
+    --line:rgba(14,36,56,.1);
+    --accent:#0f5a9e;
+    --amber:#e79b1e;
+    --plane-size:clamp(72px,11vw,118px);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 38%,var(--sky-low) 68%,var(--sky-horizon) 100%);
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---- cielo y nubes ---- */
+  .sky{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+  .sky::after{ /* luz alta */
+    content:"";position:absolute;inset:0;
+    background:radial-gradient(60% 40% at 50% 0%,rgba(255,255,255,.22),transparent 70%);
+  }
+  .cloud{
+    position:absolute;border-radius:999px;
+    background:radial-gradient(closest-side,rgba(255,255,255,.85),rgba(255,255,255,0) 72%);
+    filter:blur(18px);opacity:.5;
+    animation:drift linear infinite alternate;
+  }
+  .c1{width:52vmax;height:14vmax;top:6%;left:-12%;animation-duration:95s}
+  .c2{width:44vmax;height:11vmax;top:22%;right:-14%;opacity:.4;animation-duration:120s}
+  .c3{width:36vmax;height:9vmax;top:48%;left:-8%;opacity:.32;animation-duration:80s}
+  .c4{width:30vmax;height:8vmax;bottom:6%;right:-6%;opacity:.3;animation-duration:105s}
+  @keyframes drift{from{transform:translateX(-4vw)}to{transform:translateX(5vw)}}
+
+  /* ---- órbita ---- */
+  .orbit-layer{position:fixed;inset:0;z-index:1;pointer-events:none}
+  .orbit-layer svg.orbit-path{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:visible}
+  .orbit-layer .track{fill:none;stroke:rgba(255,255,255,.38);stroke-width:1.5;stroke-dasharray:3 9;stroke-linecap:round}
+  #plane{
+    position:absolute;left:0;top:0;width:var(--plane-size);aspect-ratio:1/1;
+    will-change:transform;filter:drop-shadow(0 14px 14px rgba(4,15,30,.35));
+  }
+  #plane .bank{width:100%;height:100%;will-change:transform}
+  #plane svg{width:100%;height:100%;display:block;overflow:visible}
+  #planeShadow{
+    position:absolute;left:0;top:0;width:calc(var(--plane-size)*.8);aspect-ratio:1.6/1;
+    background:radial-gradient(closest-side,rgba(3,12,24,.35),transparent 72%);
+    filter:blur(6px);will-change:transform;opacity:.6;
+  }
+  .prop-blur{transform-box:fill-box;transform-origin:center;animation:prop 1.1s ease-in-out infinite alternate;opacity:.5}
+  @keyframes prop{from{opacity:.32}to{opacity:.6}}
+
+  /* ---- composición ---- */
+  header{position:relative;z-index:2;display:flex;justify-content:center;padding:26px 16px 0;min-height:86px}
+  .logo-slot{
+    width:min(220px,60vw);height:52px;border:1.5px dashed rgba(255,255,255,.5);
+    border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:rgba(255,255,255,.75);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  }
+  main{position:relative;z-index:2;flex:1;display:flex;align-items:center;justify-content:center;padding:18px 16px 10px}
+  .card{
+    width:min(600px,92vw);background:var(--card);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.7);border-radius:var(--radius);
+    box-shadow:0 24px 60px rgba(4,15,30,.35);
+    padding:clamp(24px,4vw,42px);text-align:center;
+  }
+  .eyebrow{
+    margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.22em;color:var(--accent);
+  }
+  h1{margin:0 0 12px;font-size:clamp(28px,5vw,42px);line-height:1.1;letter-spacing:-.01em}
+  .desc{margin:0 auto 10px;max-width:46ch;color:#25405a;font-size:clamp(15px,2.4vw,17px);line-height:1.6}
+  .sub{margin:0 auto 20px;max-width:46ch;color:var(--muted);font-size:14px;line-height:1.6}
+  .status{
+    display:inline-flex;align-items:center;gap:10px;
+    border:1px solid var(--line);border-radius:999px;padding:9px 16px;
+    font-size:13.5px;font-weight:600;color:#274b68;background:rgba(15,90,158,.07);
+  }
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--amber);position:relative;flex:none}
+  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--amber);opacity:.5;animation:ping 1.8s ease-out infinite}
+  @keyframes ping{from{transform:scale(.5);opacity:.7}to{transform:scale(1.1);opacity:0}}
+  footer{position:relative;z-index:2;text-align:center;padding:14px 16px 26px;color:rgba(255,255,255,.85);font-size:13.5px;letter-spacing:.02em}
+
+  @media (max-width:560px){
+    :root{--plane-size:68px}
+    header{min-height:70px;padding-top:18px}
+    .logo-slot{height:44px}
+    .cloud{filter:blur(14px)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .cloud,.dot::after,.prop-blur{animation:none !important}
+    .orbit-layer .track{stroke-dasharray:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="sky" aria-hidden="true">
+  <div class="cloud c1"></div><div class="cloud c2"></div>
+  <div class="cloud c3"></div><div class="cloud c4"></div>
+</div>
+
+<div class="orbit-layer" aria-hidden="true">
+  <svg class="orbit-path" id="orbitPath" width="100" height="100" viewBox="0 0 100 100" fill="none">
+    <ellipse class="track" id="orbitTrack" cx="50" cy="50" rx="48" ry="48" />
+  </svg>
+  <div id="planeShadow"></div>
+  <div id="plane">
+    <div class="bank" id="bank">
+      <!-- DHC-6 Twin Otter, vista superior, morro hacia arriba -->
+      <svg viewBox="0 0 600 600" role="img" aria-label="Avión Twin Otter bimotor volando en círculo">
+        <g stroke-linejoin="round" stroke-linecap="round">
+          <!-- sombra de profundidad del ala -->
+          <ellipse cx="300" cy="240" rx="252" ry="26" fill="#0a1c30" opacity=".18"/>
+          <!-- estabilizadores horizontales -->
+          <path d="M279 420 L184 462 L168 449 L263 399 Z" fill="#dfe9f2" stroke="#16293b" stroke-width="6"/>
+          <path d="M321 420 L416 462 L432 449 L337 399 Z" fill="#dfe9f2" stroke="#16293b" stroke-width="6"/>
+          <!-- deriva vertical -->
+          <path d="M282 412 L300 368 L318 412 L312 452 L288 452 Z" fill="#0f5a9e" stroke="#16293b" stroke-width="6"/>
+          <!-- fuselaje -->
+          <path d="M300 48 C288 60 283 82 281 111 L275 176 L267 244 L258 314 L247 382 L243 422 Q244 449 258 472 L281 500 L300 526 L319 500 L342 472 Q356 449 357 422 L353 382 L342 314 L333 244 L325 176 L319 111 C317 82 312 60 300 48 Z"
+                fill="#f4f7fa" stroke="#16293b" stroke-width="7"/>
+          <!-- ala alta rectangular -->
+          <path d="M281 174 L58 276 L48 288 L55 301 L267 255 L274 291 L326 291 L333 255 L545 301 L552 288 L542 276 L319 174 Z"
+                fill="#e8eff6" stroke="#16293b" stroke-width="7"/>
+          <path d="M76 272 L260 190 L263 204 L82 284 Z" fill="#9fb6c9"/>
+          <path d="M524 272 L340 190 L337 204 L518 284 Z" fill="#9fb6c9"/>
+          <path d="M62 291 L265 247 M538 291 L335 247" fill="none" stroke="#5b7a93" stroke-width="2.5"/>
+          <!-- góndolas motor -->
+          <path d="M180 225 L211 211 L238 258 L213 272 Z" fill="#cfdce8" stroke="#16293b" stroke-width="6"/>
+          <path d="M420 225 L389 211 L362 258 L387 272 Z" fill="#cfdce8" stroke="#16293b" stroke-width="6"/>
+          <!-- discos de hélice (estela sutil) -->
+          <ellipse class="prop-blur" cx="205" cy="232" rx="46" ry="12" fill="#ffffff" opacity=".45"/>
+          <ellipse class="prop-blur" cx="395" cy="232" rx="46" ry="12" fill="#ffffff" opacity=".45"/>
+          <!-- hélices tripala -->
+          <g fill="#16293b">
+            <path d="M201 218 Q177 196 183 187 Q193 184 211 211 Z"/>
+            <path d="M216 244 Q242 258 238 269 Q228 273 210 252 Z"/>
+            <path d="M199 252 Q187 280 177 276 Q174 266 191 246 Z"/>
+            <path d="M399 218 Q423 196 417 187 Q407 184 389 211 Z"/>
+            <path d="M384 244 Q358 258 362 269 Q372 273 390 252 Z"/>
+            <path d="M401 252 Q413 280 423 276 Q426 266 409 246 Z"/>
+          </g>
+          <!-- cabina y ventanas -->
+          <path d="M287 77 Q300 64 313 77 L319 111 L281 111 Z" fill="#16324c"/>
+          <g fill="#7fb2d4">
+            <rect x="287" y="135" width="9" height="13" rx="3"/>
+            <rect x="304" y="135" width="9" height="13" rx="3"/>
+            <rect x="285" y="158" width="9" height="13" rx="3"/>
+            <rect x="306" y="158" width="9" height="13" rx="3"/>
+            <rect x="282" y="181" width="9" height="13" rx="3"/>
+            <rect x="309" y="181" width="9" height="13" rx="3"/>
+            <rect x="280" y="204" width="9" height="13" rx="3"/>
+            <rect x="311" y="204" width="9" height="13" rx="3"/>
+          </g>
+          <!-- tren fijo -->
+          <g stroke="#16293b" stroke-width="8" fill="#16293b">
+            <path d="M258 333 L245 362 M342 333 L355 362" fill="none"/>
+            <circle cx="242" cy="367" r="9" stroke="none"/>
+            <circle cx="358" cy="367" r="9" stroke="none"/>
+          </g>
+          <path d="M270 435 L300 451 L330 435" fill="none" stroke="#5b7a93" stroke-width="2.5"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo-slot">Espacio para logotipo</div>
+</header>
+
+<main>
+  <section class="card" role="status" aria-live="polite">
+    <p class="eyebrow">Estamos realizando mejoras</p>
+    <h1>Estamos en mantenimiento</h1>
+    <p class="desc">Estamos trabajando para ofrecerte una mejor experiencia. Nuestro equipo est&aacute; realizando algunas mejoras y pronto estaremos de regreso.</p>
+    <p class="sub">Gracias por tu paciencia. Seguimos trabajando para conectarte con nuevos destinos.</p>
+    <span class="status"><span class="dot" aria-hidden="true"></span>Sistemas en actualizaci&oacute;n</span>
+  </section>
+</main>
+
+<footer>Gracias por volar con nosotros</footer>
+
+<script>
+(function(){
+  var plane = document.getElementById('plane');
+  var bank = document.getElementById('bank');
+  var shadow = document.getElementById('planeShadow');
+  var orbitSvg = document.getElementById('orbitPath');
+  var track = document.getElementById('orbitTrack');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var geo = { cx: 0, cy: 0, rx: 300, ry: 220, size: 100 };
+
+  function compute(){
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var card = document.querySelector('.card');
+    var r = card ? card.getBoundingClientRect() : { width: 560, height: 340 };
+    var size = parseFloat(getComputedStyle(plane).width) || 96;
+    // Radio suficientemente amplio para rodear la tarjeta sin cruzar el texto
+    var rx = Math.max(r.width / 2 + 110, Math.min(vw * 0.38, 470));
+    var ry = Math.max(r.height / 2 + 100, Math.min(vh * 0.32, 330));
+    // Evitar salida de pantalla
+    rx = Math.min(rx, vw / 2 - size * 0.4);
+    ry = Math.min(ry, vh / 2 - size * 0.7);
+    if (vw < 560) { rx = Math.min(rx, vw / 2 - 30); ry = Math.min(ry, vh / 2 - 60); }
+    geo = { cx: vw / 2, cy: vh / 2 - 10, rx: Math.max(rx, 120), ry: Math.max(ry, 100), size: size };
+
+    // Sincronizar elipse visible con la trayectoria real
+    var W = geo.rx * 2 + size, H = geo.ry * 2 + size;
+    orbitSvg.setAttribute('width', W); orbitSvg.setAttribute('height', H);
+    orbitSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    track.setAttribute('cx', W / 2); track.setAttribute('cy', H / 2);
+    track.setAttribute('rx', geo.rx); track.setAttribute('ry', geo.ry);
+  }
+
+  function place(angle){
+    var x = geo.cx + geo.rx * Math.cos(angle);
+    var y = geo.cy + geo.ry * Math.sin(angle);
+    var dx = -geo.rx * Math.sin(angle);
+    var dy = geo.ry * Math.cos(angle);
+    var heading = Math.atan2(dy, dx) * 180 / Math.PI + 90; // el SVG apunta arriba
+    var depth = Math.sin(angle); // +1 abajo (cerca), -1 arriba (lejos)
+    var scale = 1 + depth * 0.13;
+    var s = geo.size;
+
+    plane.style.transform =
+      'translate(' + (x - s / 2) + 'px,' + (y - s / 2) + 'px)' +
+      ' rotate(' + heading.toFixed(2) + 'deg)' +
+      ' scale(' + scale.toFixed(3) + ')';
+    // Alabeo de viraje: inclina ligeramente las alas hacia el centro
+    bank.style.transform = 'skewX(-7deg) scaleX(.94)';
+    // Sombra desfasada, más difusa cuando el avión está "lejos"
+    var shScale = (1 - depth * 0.08).toFixed(3);
+    shadow.style.transform =
+      'translate(' + (x - s * 0.4 + 16) + 'px,' + (y - s * 0.28 + 26) + 'px)' +
+      ' scale(' + shScale + ')';
+    shadow.style.opacity = (0.55 - depth * 0.15).toFixed(2);
+  }
+
+  compute();
+  window.addEventListener('resize', compute);
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(compute).observe(document.querySelector('.card'));
+  }
+
+  if (reduce) { place(-0.7); return; } // versión estática, avión arriba-derecha
+
+  var PERIOD = 16000; // un giro cada 16 s
+  var start = null;
+  function frame(t){
+    if (start === null) start = t;
+    var angle = ((t - start) / PERIOD) * Math.PI * 2;
+    place(angle);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
